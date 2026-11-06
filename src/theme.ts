@@ -2,7 +2,7 @@
 export type ThemePref = "auto" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
-export const THEME_KEY = "quran-widget.theme";
+export const THEME_KEY = "simak.theme";
 
 /** Bagian minimal dari `Storage` yang dipakai (mudah diganti di tes). */
 export interface KeyValueStore {

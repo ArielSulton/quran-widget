@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Quran Widget",
+  "productName": "Simak",
   "version": "0.1.0",
-  "identifier": "dev.quranwidget.app",
+  "identifier": "app.simak.ayat",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Quran Widget",
+        "title": "Simak",
         "width": 520,
         "height": 320,
         "minWidth": 340,

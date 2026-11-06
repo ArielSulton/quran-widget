@@ -1,7 +1,9 @@
 [package]
 name = "quran-widget"
 version = "0.1.0"
-description = "Widget ayat Al-Qur'an yang mengikuti pemutaran Spotify"
+description = "Simak: widget yang menampilkan ayat Al-Qur'an yang sedang dibacakan di Spotify"
+authors = ["Simak contributors"]
+repository = "https://github.com/OWNER/simak-ayat"
 edition = "2021"
 default-run = "quran-widget"
 rust-version = "1.88"

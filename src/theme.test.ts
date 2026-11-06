@@ -28,7 +28,7 @@ describe("resolveTheme", () => {
 
 describe("loadTheme / saveTheme", () => {
   it("kunci penyimpanan", () => {
-    expect(THEME_KEY).toBe("quran-widget.theme");
+    expect(THEME_KEY).toBe("simak.theme");
   });
 
   it("bawaan auto bila kosong", () => {

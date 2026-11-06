@@ -1,7 +1,7 @@
 import type { KeyValueStore } from "./theme";
 
 /** Geser sinkron pengguna, dalam ms. Positif = pergantian ayat muncul LEBIH LAMBAT. */
-export const SYNC_KEY = "quran-widget.syncMs";
+export const SYNC_KEY = "simak.syncMs";
 export const SYNC_STEP_MS = 100;
 /** Langkah kasar (Shift): satu detik penuh. */
 export const SYNC_COARSE_STEP_MS = 1000;

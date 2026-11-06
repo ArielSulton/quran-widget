@@ -32,7 +32,7 @@ describe("konstanta", () => {
     expect(SYNC_COARSE_STEP_MS).toBe(1000);
     expect(SYNC_MIN_MS).toBe(-2000);
     expect(SYNC_MAX_MS).toBe(2000);
-    expect(SYNC_KEY).toBe("quran-widget.syncMs");
+    expect(SYNC_KEY).toBe("simak.syncMs");
   });
 });
 

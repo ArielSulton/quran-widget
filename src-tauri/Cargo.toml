@@ -3,6 +3,7 @@ name = "quran-widget"
 version = "0.1.0"
 description = "Widget ayat Al-Qur'an yang mengikuti pemutaran Spotify"
 edition = "2021"
+default-run = "quran-widget"
 rust-version = "1.88"
 
 [lib]
@@ -12,5 +13,17 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[[bin]]
+name = "quran-widget"
+path = "src/main.rs"
+
+[[bin]]
+name = "dump_titles"
+path = "src/bin/dump_titles.rs"
+
 [dependencies]
 tauri = { version = "2", features = [] }
+serde_json = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+mpris = "2"

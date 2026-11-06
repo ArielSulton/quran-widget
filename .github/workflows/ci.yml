@@ -1,4 +1,5 @@
 # Pemeriksaan pada setiap push ke main dan setiap pull request.
+# Kebijakan pin: semua aksi pihak ketiga dipin ke SHA commit lengkap (komentar menyebut versinya).
 # Tes alat Python (tools/) sengaja TIDAK dijalankan di sini: butuh model dan jaringan.
 name: CI
 
@@ -18,8 +19,8 @@ jobs:
   frontend:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -30,7 +31,7 @@ jobs:
   rust:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Paket sistem (Tauri + D-Bus untuk MPRIS)
         run: |
           sudo apt-get update
@@ -38,7 +39,7 @@ jobs:
             build-essential pkg-config \
             libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
             librsvg2-dev libdbus-1-dev patchelf
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -46,11 +47,14 @@ jobs:
       # tauri-build memeriksa folder frontendDist saat kompilasi.
       - run: npm run build
       # Catatan: di lokal dipakai CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback karena toolchain
-      # lokal Rust 1.88; di CI dipakai Rust stable terbaru dan Cargo.lock yang sudah dikomit (--locked).
-      - uses: dtolnay/rust-toolchain@stable
+      # lokal Rust 1.88; di CI toolchain dipatok ke Rust 1.99.1 (stable per 2026-10-15) supaya lint
+      # clippy baru tidak tiba-tiba menggagalkan CI; naikkan versinya dengan sengaja.
+      # Aksinya dipin ke SHA commit cabang `stable` milik dtolnay; versi ditentukan input `toolchain`.
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # branch "stable" (commit pinned 2026-11-06)
         with:
+          toolchain: 1.99.1
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: src-tauri
       - name: cargo test
@@ -74,16 +78,18 @@ jobs:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       # tauri-build memeriksa folder frontendDist saat kompilasi.
       - run: npm run build
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # branch "stable" (commit pinned 2026-11-06)
+        with:
+          toolchain: 1.99.1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: src-tauri
       - name: cargo check

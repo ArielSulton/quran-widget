@@ -20,8 +20,8 @@
 # Untuk menandatangani nanti, tambahkan secret repositori dan buka komentar pada bagian `env:` langkah
 # tauri-action di bawah (lihat https://v2.tauri.app/distribute/sign/macos/ dan .../windows/).
 #
-# Kebijakan pin: tauri-action dipin ke SHA commit (aksi yang menyentuh GITHUB_TOKEN dengan hak tulis);
-# aksi lain (actions/*, dtolnay, Swatinem) memakai tag mayor.
+# Kebijakan pin: semua aksi pihak ketiga dipin ke SHA commit lengkap (komentar menyebut versinya);
+# dtolnay/rust-toolchain dipin ke commit cabang `stable` dan versi Rust ditentukan input `toolchain`.
 name: Release
 
 on:
@@ -42,6 +42,8 @@ jobs:
   # workflow_dispatch. `matrix` tidak bisa dipakai di `if:` tingkat job, jadi matriksnya dibuat di sini.
   plan:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
@@ -72,7 +74,7 @@ jobs:
           echo "Jalankan workflow ini dari sebuah tag v* (bukan cabang)." >&2
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Pastikan tabel waktu ayat ada
         shell: bash
@@ -91,18 +93,38 @@ jobs:
             libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
             librsvg2-dev libdbus-1-dev patchelf
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
 
-      # Rust stable terbaru. CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback hanya diperlukan di
+      # Tag vX.Y.Z harus sama dengan versi di tauri.conf.json, package.json, dan Cargo.toml.
+      - name: Pastikan tag cocok dengan versi aplikasi
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          conf_version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          pkg_version="$(node -p "require('./package.json').version")"
+          crate_version="$(sed -n 's/^version = "\(.*\)"$/\1/p' src-tauri/Cargo.toml | head -n 1)"
+          echo "tag=$tag_version tauri.conf.json=$conf_version package.json=$pkg_version Cargo.toml=$crate_version"
+          status=0
+          for v in "$conf_version" "$pkg_version" "$crate_version"; do
+            if [ "$v" != "$tag_version" ]; then status=1; fi
+          done
+          if [ "$status" -ne 0 ]; then
+            echo "Versi tag ($tag_version) harus sama dengan versi di ketiga berkas." >&2
+            exit 1
+          fi
+
+      # Rust 1.99.1 (sama dengan ci.yml). CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback hanya diperlukan di
       # mesin lokal dengan Rust 1.88; di CI Cargo.lock yang dikomit dipakai apa adanya.
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # branch "stable" (commit pinned 2026-11-06)
         with:
+          toolchain: 1.99.1
           targets: ${{ matrix.rust-targets }}
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: src-tauri
 
@@ -126,7 +148,7 @@ jobs:
           releaseName: "Simak ${{ github.ref_name }}"
           releaseBody: |
             Simak ${{ github.ref_name }} (pra-rilis).
-            Build Linux adalah yang terverifikasi. Build macOS dan Windows (bila ada di rilis ini) bersifat eksperimental: dukungan pemutarannya sudah diimplementasikan tetapi belum diverifikasi di mesin asli.
+            Sumber pemutaran Linux diverifikasi di satu mesin (X11/GNOME); installer belum pernah dicoba. Build macOS dan Windows (bila ada di rilis ini) bersifat eksperimental: dukungan pemutarannya sudah diimplementasikan tetapi belum diverifikasi di mesin asli.
             Installer belum ditandatangani: macOS Gatekeeper dan Windows SmartScreen akan menampilkan peringatan.
             Lihat README untuk batasan lengkap.
           releaseDraft: true

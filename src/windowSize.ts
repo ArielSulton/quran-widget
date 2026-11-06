@@ -9,7 +9,7 @@ export interface WindowSize {
 export const WINDOW_SIZE_KEY = "simak.windowSize";
 export const DEFAULT_WINDOW_SIZE: WindowSize = { w: 520, h: 320 };
 /** Sama dengan `minWidth`/`minHeight` di tauri.conf.json. */
-export const MIN_WINDOW_SIZE: WindowSize = { w: 420, h: 260 };
+export const MIN_WINDOW_SIZE: WindowSize = { w: 430, h: 270 };
 export const MAX_WINDOW_SIZE: WindowSize = { w: 2000, h: 1200 };
 
 /** Nilai di atas ini dianggap rusak (bukan sekadar jendela yang sangat besar). */
@@ -17,7 +17,7 @@ const ABSURD_PX = 10000;
 
 const clamp = (n: number, min: number, max: number): number => Math.min(max, Math.max(min, n));
 
-/** Bulatkan lalu jepit ke [420,2000] x [260,1200]. */
+/** Bulatkan lalu jepit ke [430,2000] x [270,1200]. */
 export function clampWindowSize(size: WindowSize): WindowSize {
   return {
     w: clamp(Math.round(size.w), MIN_WINDOW_SIZE.w, MAX_WINDOW_SIZE.w),
@@ -106,4 +106,37 @@ export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: numb
   }) as Debounced<A>;
   wrapped.cancel = () => clearTimeout(timer);
   return wrapped;
+}
+
+/** Ruang yang disisakan dari monitor untuk panel/dok (px logis): lebar, tinggi. */
+export const MONITOR_MARGIN: WindowSize = { w: 80, h: 120 };
+
+/** Ukuran monitor dalam px logis dari `Monitor` Tauri (fisik / skala); `null` bila tak sah. */
+export function monitorLogicalSize(
+  monitor: { size: { width: number; height: number }; scaleFactor: number } | null,
+): WindowSize | null {
+  if (!monitor) return null;
+  const f = Number.isFinite(monitor.scaleFactor) && monitor.scaleFactor > 0 ? monitor.scaleFactor : 1;
+  const w = monitor.size.width / f;
+  const h = monitor.size.height / f;
+  if (!(w > 0) || !(h > 0) || !Number.isFinite(w) || !Number.isFinite(h)) return null;
+  return { w: Math.round(w), h: Math.round(h) };
+}
+
+/**
+ * Batasi `size` ke monitor dikurangi `margin`, tetapi tidak pernah di bawah `min`. Monitor `null`
+ * (tidak diketahui) meloloskan ukuran apa adanya.
+ */
+export function fitToMonitor(
+  size: WindowSize,
+  monitorLogical: WindowSize | null,
+  min: WindowSize,
+  margin: WindowSize,
+): WindowSize {
+  if (!monitorLogical || !(monitorLogical.w > 0) || !(monitorLogical.h > 0)) return size;
+  if (!Number.isFinite(monitorLogical.w) || !Number.isFinite(monitorLogical.h)) return size;
+  return {
+    w: Math.max(min.w, Math.min(size.w, monitorLogical.w - margin.w)),
+    h: Math.max(min.h, Math.min(size.h, monitorLogical.h - margin.h)),
+  };
 }

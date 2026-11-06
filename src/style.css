@@ -181,7 +181,8 @@ html[data-material="native"] #widget {
 
 /* Ayat panjang (data-density="compact", diset dari main.ts): rapatkan agar muat tanpa terpotong. */
 #content[data-density="compact"] {
-  padding: 18px 30px 36px;
+  /* Bawah: ruang untuk pil kontrol (tinggi 30 + bottom 9 = 39 px) ditambah jarak 5 px. */
+  padding: 18px 30px 44px;
 }
 #content[data-density="compact"] #arabic {
   line-height: 1.85;

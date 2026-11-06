@@ -5,7 +5,10 @@ import {
   MIN_WINDOW_SIZE,
   WINDOW_SIZE_KEY,
   clampWindowSize,
+  MONITOR_MARGIN,
   debounce,
+  fitToMonitor,
+  monitorLogicalSize,
   loadWindowSize,
   parseWindowSize,
   physicalToLogical,
@@ -24,20 +27,20 @@ function memStore(initial: Record<string, string> = {}): KeyValueStore & { data:
 }
 
 describe("konstanta", () => {
-  it("bawaan 520x320, minimum 420x260, maksimum 2000x1200", () => {
+  it("bawaan 520x320, minimum 430x270, maksimum 2000x1200", () => {
     expect(DEFAULT_WINDOW_SIZE).toEqual({ w: 520, h: 320 });
-    expect(MIN_WINDOW_SIZE).toEqual({ w: 420, h: 260 });
+    expect(MIN_WINDOW_SIZE).toEqual({ w: 430, h: 270 });
     expect(MAX_WINDOW_SIZE).toEqual({ w: 2000, h: 1200 });
     expect(WINDOW_SIZE_KEY).toBe("simak.windowSize");
   });
 });
 
 describe("clampWindowSize", () => {
-  it("menjepit ke [420,2000] x [260,1200] dan membulatkan", () => {
-    expect(clampWindowSize({ w: 100, h: 100 })).toEqual({ w: 420, h: 260 });
+  it("menjepit ke [430,2000] x [270,1200] dan membulatkan", () => {
+    expect(clampWindowSize({ w: 100, h: 100 })).toEqual({ w: 430, h: 270 });
     expect(clampWindowSize({ w: 5000, h: 5000 })).toEqual({ w: 2000, h: 1200 });
     expect(clampWindowSize({ w: 700.4, h: 400.6 })).toEqual({ w: 700, h: 401 });
-    expect(clampWindowSize({ w: 420, h: 260 })).toEqual({ w: 420, h: 260 });
+    expect(clampWindowSize({ w: 430, h: 270 })).toEqual({ w: 430, h: 270 });
     expect(clampWindowSize({ w: 2000, h: 1200 })).toEqual({ w: 2000, h: 1200 });
   });
 });
@@ -48,7 +51,7 @@ describe("parseWindowSize", () => {
   });
 
   it("di luar rentang tetapi masuk akal: dijepit", () => {
-    expect(parseWindowSize('{"w":300,"h":100}')).toEqual({ w: 420, h: 260 });
+    expect(parseWindowSize('{"w":300,"h":100}')).toEqual({ w: 430, h: 270 });
     expect(parseWindowSize('{"w":3000,"h":2000}')).toEqual({ w: 2000, h: 1200 });
   });
 
@@ -91,7 +94,7 @@ describe("loadWindowSize / saveWindowSize", () => {
   it("menjepit saat menyimpan", () => {
     const store = memStore();
     saveWindowSize(store, { w: 10, h: 99999 });
-    expect(store.data[WINDOW_SIZE_KEY]).toBe('{"w":420,"h":1200}');
+    expect(store.data[WINDOW_SIZE_KEY]).toBe('{"w":430,"h":1200}');
   });
 
   it("penyimpanan yang melempar tidak merusak (baca => bawaan, tulis diabaikan)", () => {
@@ -121,8 +124,8 @@ describe("stepWindowSize", () => {
   });
 
   it("dijepit ke minimum dan maksimum", () => {
-    expect(stepWindowSize({ w: 425, h: 265 }, "ArrowLeft", true)).toEqual({ w: 420, h: 265 });
-    expect(stepWindowSize({ w: 425, h: 265 }, "ArrowUp", true)).toEqual({ w: 425, h: 260 });
+    expect(stepWindowSize({ w: 435, h: 275 }, "ArrowLeft", true)).toEqual({ w: 430, h: 275 });
+    expect(stepWindowSize({ w: 435, h: 275 }, "ArrowUp", true)).toEqual({ w: 435, h: 270 });
     expect(stepWindowSize({ w: 1990, h: 1195 }, "ArrowRight", true)).toEqual({ w: 2000, h: 1195 });
     expect(stepWindowSize({ w: 1990, h: 1195 }, "ArrowDown", true)).toEqual({ w: 1990, h: 1200 });
   });
@@ -172,5 +175,52 @@ describe("debounce", () => {
     d.cancel();
     vi.advanceTimersByTime(1000);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("fitToMonitor", () => {
+  const min = MIN_WINDOW_SIZE;
+  const margin = MONITOR_MARGIN;
+
+  it("margin bawaan: 80 px lebar, 120 px tinggi (panel dan dok)", () => {
+    expect(MONITOR_MARGIN).toEqual({ w: 80, h: 120 });
+  });
+
+  it("ukuran tersimpan lebih besar dari monitor diperkecil ke monitor dikurangi margin", () => {
+    expect(fitToMonitor({ w: 2000, h: 1200 }, { w: 1366, h: 768 }, min, margin)).toEqual({ w: 1286, h: 648 });
+    expect(fitToMonitor({ w: 1500, h: 400 }, { w: 1920, h: 1080 }, min, margin)).toEqual({ w: 1500, h: 400 });
+    expect(fitToMonitor({ w: 1900, h: 1000 }, { w: 1920, h: 1080 }, min, margin)).toEqual({ w: 1840, h: 960 });
+  });
+
+  it("ukuran yang sudah muat tidak diubah", () => {
+    expect(fitToMonitor({ w: 800, h: 500 }, { w: 1920, h: 1080 }, min, margin)).toEqual({ w: 800, h: 500 });
+  });
+
+  it("monitor sangat kecil tidak pernah menurunkan di bawah minimum", () => {
+    expect(fitToMonitor({ w: 800, h: 500 }, { w: 480, h: 300 }, min, margin)).toEqual({ w: 430, h: 270 });
+    expect(fitToMonitor({ w: 800, h: 500 }, { w: 100, h: 100 }, min, margin)).toEqual({ w: 430, h: 270 });
+  });
+
+  it("monitor null atau tak sah: ukuran dilewatkan apa adanya", () => {
+    expect(fitToMonitor({ w: 2000, h: 1200 }, null, min, margin)).toEqual({ w: 2000, h: 1200 });
+    expect(fitToMonitor({ w: 2000, h: 1200 }, { w: Number.NaN, h: 768 }, min, margin)).toEqual({ w: 2000, h: 1200 });
+    expect(fitToMonitor({ w: 2000, h: 1200 }, { w: 0, h: 0 }, min, margin)).toEqual({ w: 2000, h: 1200 });
+  });
+
+  it("HiDPI: skala 2 dan 1,25 (monitor fisik dibagi skala)", () => {
+    // 3840x2160 fisik, skala 2 => 1920x1080 logis => batas 1840x960
+    const m2 = monitorLogicalSize({ size: { width: 3840, height: 2160 }, scaleFactor: 2 });
+    expect(m2).toEqual({ w: 1920, h: 1080 });
+    expect(fitToMonitor({ w: 2000, h: 1200 }, m2, min, margin)).toEqual({ w: 1840, h: 960 });
+    // 1920x1200 fisik, skala 1,25 => 1536x960 logis => batas 1456x840
+    const m125 = monitorLogicalSize({ size: { width: 1920, height: 1200 }, scaleFactor: 1.25 });
+    expect(m125).toEqual({ w: 1536, h: 960 });
+    expect(fitToMonitor({ w: 2000, h: 1200 }, m125, min, margin)).toEqual({ w: 1456, h: 840 });
+  });
+
+  it("monitorLogicalSize: skala tak sah dianggap 1, ukuran nol/NaN => null", () => {
+    expect(monitorLogicalSize({ size: { width: 1920, height: 1080 }, scaleFactor: 0 })).toEqual({ w: 1920, h: 1080 });
+    expect(monitorLogicalSize({ size: { width: 0, height: 1080 }, scaleFactor: 1 })).toBeNull();
+    expect(monitorLogicalSize(null)).toBeNull();
   });
 });

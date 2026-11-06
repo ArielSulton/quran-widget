@@ -17,7 +17,7 @@ const caps = JSON.parse(readFileSync(here("../src-tauri/capabilities/default.jso
 describe("ukuran jendela di tauri.conf.json", () => {
   const win = conf.app.windows[0];
 
-  it("bawaan 520x320 dan minimum 420x260, sama dengan konstanta antarmuka", () => {
+  it("bawaan 520x320 dan minimum 430x270, sama dengan konstanta antarmuka", () => {
     expect({ w: win.width, h: win.height }).toEqual(DEFAULT_WINDOW_SIZE);
     expect({ w: win.minWidth, h: win.minHeight }).toEqual(MIN_WINDOW_SIZE);
     expect(win.resizable).toBe(true);

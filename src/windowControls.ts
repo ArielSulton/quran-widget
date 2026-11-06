@@ -1,6 +1,10 @@
 import type { KeyValueStore } from "./theme";
 import {
+  MIN_WINDOW_SIZE,
+  MONITOR_MARGIN,
   debounce,
+  fitToMonitor,
+  monitorLogicalSize,
   loadWindowSize,
   physicalToLogical,
   saveWindowSize,
@@ -19,6 +23,17 @@ const RESTORE_SETTLE_MS = 150;
 const ARM_DELAY_MS = 500;
 /** Pengaman: kartu tidak pernah tersembunyi lebih lama dari ini bila pemulihan macet (ms). */
 const RESTORE_FAILSAFE_MS = 1500;
+
+/** Batasi ke monitor jendela saat ini; bila pembacaan monitor gagal atau null, ukuran apa adanya. */
+async function fitToCurrentMonitor(api: WindowApi, size: WindowSize): Promise<WindowSize> {
+  try {
+    const monitor = await api.currentMonitor();
+    return fitToMonitor(size, monitorLogicalSize(monitor), MIN_WINDOW_SIZE, MONITOR_MARGIN);
+  } catch (e) {
+    console.error("gagal membaca monitor:", e);
+    return size;
+  }
+}
 
 const fail = (what: string) => (e: unknown) => console.error(`gagal ${what}:`, e);
 
@@ -61,8 +76,9 @@ export function initResizeGrip(api: Promise<WindowApi> | null): void {
         const win = getCurrentWindow();
         const current =
           target ?? physicalToLogical(await win.innerSize(), await win.scaleFactor());
-        const next = stepWindowSize(current, key, shiftKey);
-        if (!next) return;
+        const stepped = stepWindowSize(current, key, shiftKey);
+        if (!stepped) return;
+        const next = await fitToCurrentMonitor(await api, stepped);
         target = next;
         await win.setSize(new LogicalSize(next.w, next.h));
       })
@@ -92,10 +108,13 @@ export function initWindowSizePersistence(api: Promise<WindowApi> | null, store:
     failsafe = window.setTimeout(reveal, RESTORE_FAILSAFE_MS);
   }
 
-  const restored = api.then(async ({ getCurrentWindow, LogicalSize }) => {
+  const restored = api.then(async (windowApi) => {
     if (!needsRestore) return;
+    const { getCurrentWindow, LogicalSize } = windowApi;
     try {
-      await getCurrentWindow().setSize(new LogicalSize(saved.w, saved.h));
+      // Ukuran tersimpan dari monitor besar tidak boleh melebihi monitor ini (posisi tidak disimpan).
+      const target = await fitToCurrentMonitor(windowApi, saved);
+      await getCurrentWindow().setSize(new LogicalSize(target.w, target.h));
       await new Promise((r) => window.setTimeout(r, RESTORE_SETTLE_MS));
     } finally {
       reveal();

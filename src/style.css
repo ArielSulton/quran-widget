@@ -1,7 +1,73 @@
+/*
+ * Widget ayat: kartu kaca ala macOS (minimalis). Bahan permukaan dipilih lewat
+ * <html data-material="native|css|solid"> dan tema lewat <html data-theme="light|dark">.
+ */
 :root {
-  /* Arab: font stack fallback saja (font belum dibundel). */
-  --font-arabic: "Amiri Quran", "Scheherazade New", "Noto Naskh Arabic", serif;
-  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-arabic: "Amiri Quran", "Scheherazade New", "Noto Naskh Arabic", "Geeza Pro", "Traditional Arabic", "Arabic Typesetting", serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+
+  --radius: 20px;
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* Terang (bawaan). */
+  --fill: rgba(255, 255, 255, 0.62);
+  --label: #1d1d1f;
+  --label-2: rgba(60, 60, 67, 0.72);
+  --label-3: rgba(60, 60, 67, 0.45);
+  --hairline: rgba(0, 0, 0, 0.12);
+  --accent: #007aff;
+  --pill-fill: rgba(255, 255, 255, 0.72);
+  --hover: rgba(0, 0, 0, 0.07);
+  --shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.28), 0 1px 4px rgba(0, 0, 0, 0.16);
+  --backdrop-adjust: brightness(1.08);
+}
+
+html[data-theme="dark"] {
+  --fill: rgba(30, 30, 32, 0.55);
+  --label: #f5f5f7;
+  --label-2: rgba(235, 235, 245, 0.68);
+  --label-3: rgba(235, 235, 245, 0.42);
+  --hairline: rgba(255, 255, 255, 0.14);
+  --accent: #0a84ff;
+  --pill-fill: rgba(60, 60, 64, 0.6);
+  --hover: rgba(255, 255, 255, 0.1);
+  --shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.6), 0 1px 4px rgba(0, 0, 0, 0.4);
+  --backdrop-adjust: brightness(0.6);
+}
+
+/* Tanpa blur di belakang jendela (Windows/Linux) isian dibuat lebih pekat agar terbaca. */
+html[data-material="solid"] {
+  --fill: rgba(250, 250, 252, 0.92);
+  --label-2: rgba(60, 60, 67, 0.78);
+  --pill-fill: rgba(235, 235, 240, 0.9);
+}
+html[data-material="solid"][data-theme="dark"] {
+  --fill: rgba(34, 34, 37, 0.92);
+  --label-2: rgba(235, 235, 245, 0.74);
+  --pill-fill: rgba(62, 62, 66, 0.9);
+}
+
+/* Kaca (css/native): isian terang sedikit lebih pekat dan terjemah dipertegas agar kontras >= 4,5:1
+   di atas latar putih maupun hitam (lihat laporan Task 12). */
+html[data-material="css"],
+html[data-material="native"] {
+  --fill: rgba(255, 255, 255, 0.68);
+  --label-2: rgba(45, 45, 51, 0.88);
+}
+html[data-material="css"][data-theme="dark"],
+html[data-material="native"][data-theme="dark"] {
+  --fill: rgba(30, 30, 32, 0.55);
+  --label-2: rgba(235, 235, 245, 0.82);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html[data-material] {
+    --fill: rgba(250, 250, 252, 0.97);
+    --backdrop-adjust: none;
+  }
+  html[data-material][data-theme="dark"] {
+    --fill: rgba(34, 34, 37, 0.97);
+  }
 }
 
 * {
@@ -16,26 +82,74 @@ body {
   background: transparent;
 }
 
-/* Mockup C "Fokus besar": gradien gelap, Arab besar di tengah, terjemah di bawah, footer kecil. */
+body {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Kartu ---- */
+
 #widget {
-  height: 100vh;
+  position: fixed;
+  inset: 16px 20px 24px; /* ruang untuk bayangan CSS (bahan css/solid) */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 28px 22px;
-  text-align: center;
-  color: #fff;
-  background: linear-gradient(160deg, #0b1d2e, #16384f);
-  font-family: var(--font-ui);
+  border-radius: var(--radius);
+  background: var(--fill);
+  color: var(--label);
+  box-shadow: var(--shadow);
   user-select: none;
   cursor: grab;
+  overflow: hidden;
+}
+
+/* Garis tepi 1 px di dalam kartu (tidak menambah ukuran). */
+#widget::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  pointer-events: none;
+}
+
+html[data-material="css"] #widget {
+  -webkit-backdrop-filter: blur(28px) saturate(180%) var(--backdrop-adjust);
+  backdrop-filter: blur(28px) saturate(180%) var(--backdrop-adjust);
+}
+
+/* native: kartu = seluruh jendela; blur, sudut dan bayangan dari OS (vibrancy, radius 18). */
+html[data-material="native"] {
+  --radius: 18px;
+}
+html[data-material="native"] #widget {
+  inset: 0;
+  box-shadow: none;
+}
+
+/* ---- Teks ---- */
+
+#content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 26px 34px 46px;
+  text-align: center;
+  transition: opacity 110ms var(--ease);
+}
+
+#content.changing {
+  opacity: 0;
+  transition-duration: 90ms;
 }
 
 #arabic {
   font-family: var(--font-arabic);
   font-size: 34px;
-  line-height: 2.1;
+  line-height: 2;
+  color: var(--label);
 }
 
 #arabic:empty {
@@ -43,22 +157,166 @@ body {
 }
 
 #translation {
-  font-size: 14px;
-  line-height: 1.6;
-  opacity: 0.85;
   margin-top: 14px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--label-2);
+  text-wrap: balance;
+}
+
+/* Ayat panjang (data-density="compact", diset dari main.ts): rapatkan agar muat tanpa terpotong. */
+#content[data-density="compact"] {
+  padding: 18px 30px 36px;
+}
+#content[data-density="compact"] #arabic {
+  line-height: 1.85;
+}
+#content[data-density="compact"] #translation {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.42;
 }
 
 #arabic:empty + #translation {
   margin-top: 0;
+  font-size: 15px;
 }
 
 #footer {
+  position: absolute;
+  bottom: 15px;
+  left: 0;
+  right: 0;
+  text-align: center;
   font-size: 11px;
-  opacity: 0.5;
-  margin-top: 16px;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-3);
+  transition: opacity 160ms var(--ease);
+  pointer-events: none; /* kartu di belakangnya tetap area seret */
 }
 
-#footer:empty {
-  display: none;
+/* ---- Kontrol (pil kecil di slot footer) ---- */
+
+#controls {
+  position: absolute;
+  bottom: 9px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--pill-fill);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  color: var(--label-2);
+  font-size: 12px;
+  cursor: default;
+  opacity: 0;
+  transform: translate(-50%, 3px);
+  transition:
+    opacity 160ms var(--ease),
+    transform 160ms var(--ease);
+}
+
+#widget:hover #controls,
+html[data-controls] #controls {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+#widget:has(:focus-visible) #controls {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+#widget:hover #footer,
+html[data-controls] #footer {
+  opacity: 0;
+}
+#widget:has(:focus-visible) #footer {
+  opacity: 0;
+}
+
+#controls .group {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+#controls .divider {
+  width: 1px;
+  height: 14px;
+  background: var(--hairline);
+}
+
+#controls button {
+  all: unset;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 999px;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+  transition:
+    background-color 120ms var(--ease),
+    color 120ms var(--ease);
+}
+
+#controls button:hover {
+  background: var(--hover);
+}
+
+#controls button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#controls button svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Segmen aktif = satu-satunya warna aksen selain cincin fokus. */
+#controls .seg[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+#controls .step[aria-disabled="true"] {
+  opacity: 0.35;
+}
+
+#controls .value {
+  min-width: 60px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--label);
+}
+
+/* ---- Pratinjau pengembangan (?preview=...&backdrop=1): latar warna-warni di belakang kartu ---- */
+
+html[data-backdrop] body {
+  background:
+    radial-gradient(circle at 18% 28%, #ffd166 0 11%, transparent 11.5%),
+    radial-gradient(circle at 82% 72%, #06d6a0 0 13%, transparent 13.5%),
+    linear-gradient(115deg, transparent 0 46%, rgba(255, 255, 255, 0.85) 46% 50%, transparent 50% 100%),
+    linear-gradient(135deg, #ff6b6b 0%, #c44dff 38%, #4d7cff 68%, #19c3e6 100%);
+}
+
+/* ---- Gerak ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }

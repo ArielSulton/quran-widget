@@ -14,14 +14,19 @@
       {
         "label": "main",
         "title": "Quran Widget",
-        "width": 480,
-        "height": 260,
+        "width": 520,
+        "height": 320,
+        "minWidth": 340,
+        "minHeight": 210,
         "decorations": false,
         "alwaysOnTop": true,
         "resizable": true,
-        "transparent": false
+        "transparent": true,
+        "shadow": false,
+        "windowEffects": { "effects": ["underWindowBackground"], "state": "active", "radius": 18 }
       }
     ],
+    "macOSPrivateApi": true,
     "security": { "csp": null }
   },
   "bundle": {

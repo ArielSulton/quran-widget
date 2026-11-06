@@ -48,7 +48,8 @@
     "resources": {
       "../data/timing/": "data/timing/",
       "../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md",
-      "../data/quran/NOTICE.md": "data/quran/NOTICE.md"
+      "../data/quran/NOTICE.md": "data/quran/NOTICE.md",
+      "../src/assets/fonts/OFL.txt": "licenses/AmiriQuran-OFL.txt"
     },
     "macOS": {
       "entitlements": "Entitlements.plist"

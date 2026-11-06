@@ -44,6 +44,13 @@ describe("font Arab yang dibundel (Amiri Quran)", () => {
     expect(html).toContain('as="font"');
   });
 
+  it("teks OFL ikut terpasang bersama aplikasi (bundle.resources)", () => {
+    const conf = JSON.parse(readFileSync(here("../src-tauri/tauri.conf.json"), "utf8"));
+    expect(conf.bundle.resources["../src/assets/fonts/OFL.txt"]).toBe("licenses/AmiriQuran-OFL.txt");
+    const notices = readFileSync(here("../THIRD-PARTY-NOTICES.md"), "utf8");
+    expect(notices).toContain("licenses/AmiriQuran-OFL.txt");
+  });
+
   it("CSP Tauri tidak diperketat sehingga memblokir font lokal", () => {
     const conf = JSON.parse(readFileSync(here("../src-tauri/tauri.conf.json"), "utf8"));
     const csp = conf.app.security.csp as string | null | Record<string, string>;

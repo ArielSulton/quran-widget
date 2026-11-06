@@ -60,8 +60,14 @@ Simak juga tidak berafiliasi dengan Spotify AB; lihat README.
 
 ## 4. Font
 
-- **Aplikasi tidak menyertakan berkas font.** `src/style.css` hanya menyebut nama font yang sudah terpasang di sistem pengguna: untuk teks Arab "Amiri Quran", "Scheherazade New", "Noto Naskh Arabic", "Geeza Pro", "Traditional Arabic", "Arabic Typesetting", lalu `serif`; untuk antarmuka font sistem (`-apple-system`, "SF Pro Text", "Segoe UI", `system-ui`, `sans-serif`). Font yang dipakai bergantung pada apa yang terpasang di komputer pengguna.
-- **Ikon aplikasi** (`src-tauri/icons/`) memuat kerangka vektor huruf sin (U+0633) dari font **Amiri Bold**, yang diubah menjadi path SVG (`src-tauri/icons/source/simak-icon.svg`, dibuat oleh `scripts/gen-icon-svg.py`). Amiri: "Copyright 2010-2022 The Amiri Project Authors (https://github.com/aliftype/amiri)", dilisensikan di bawah SIL Open Font License 1.1 (https://scripts.sil.org/OFL). Berkas font Amiri sendiri tidak didistribusikan oleh Simak.
+- **Amiri Quran (disertakan dalam aplikasi).** Aplikasi menyertakan berkas font `src/assets/fonts/AmiriQuran-Regular.woff2` untuk menampilkan teks Arab, karena font sistem umumnya tidak memuat tanda-tanda Qur'an (muncul sebagai kotak kosong).
+  - Nama dan versi: Amiri Quran Regular, Version 1.001, perancang Khaled Hosny (Alif Type), https://github.com/aliftype/amiri
+  - Hak cipta (persis seperti di tabel nama font): "Copyright 2010-2022 The Amiri Project Authors (https://github.com/aliftype/amiri)."
+  - Lisensi: SIL Open Font License, Version 1.1 (https://openfontlicense.org/). Teks lengkap: `src/assets/fonts/OFL.txt`. Font tidak mencantumkan Reserved Font Name.
+  - Perubahan: **tidak ada.** Berkas `AmiriQuran.ttf` asli (SHA-256 `a406aa685f307d96327deecaae6d69322d28e30cd7ec8929badbee19a7e6c585`) hanya dibungkus ulang sebagai WOFF2 tanpa mengubah glif, tabel, atau fitur apa pun dan tanpa subset (SHA-256 berkas yang dikirim: `d2300497794c78746ad11ce3ead5c2c246cc9b0aeaaa35308288a3e211853035`). Rincian ada di `src/assets/fonts/README.md`.
+  - Font ini dikirim bersama aplikasi dan tidak dijual terpisah, sesuai syarat OFL. Pengecekan bahwa font memuat semua karakter yang ditampilkan: `tools/check_font_coverage.py`.
+- Font **cadangan** yang hanya disebut namanya di `src/style.css` (tidak disertakan): "Scheherazade New", "Noto Naskh Arabic", "Geeza Pro", "Traditional Arabic", "Arabic Typesetting", lalu `serif`; untuk antarmuka font sistem (`-apple-system`, "SF Pro Text", "Segoe UI", `system-ui`, `sans-serif`).
+- **Ikon aplikasi** (`src-tauri/icons/`) memuat kerangka vektor huruf sin (U+0633) dari font **Amiri Bold**, yang diubah menjadi path SVG (`src-tauri/icons/source/simak-icon.svg`, dibuat oleh `scripts/gen-icon-svg.py`). Amiri: "Copyright 2010-2022 The Amiri Project Authors (https://github.com/aliftype/amiri)", dilisensikan di bawah SIL Open Font License 1.1 (https://scripts.sil.org/OFL). Berkas font Amiri Bold sendiri tidak didistribusikan oleh Simak.
 
 ## 5. Dependensi perangkat lunak
 

@@ -107,7 +107,7 @@ Tabel di `data/timing/` dihitung di sisi pengembang dengan alat Python di `tools
 
 Lisensi proyek belum dipilih. Selama belum ada berkas lisensi, secara hukum berlaku "hak cipta dilindungi" (*all rights reserved*) untuk kode di repositori publik ini.
 
-Pilihan lisensi dibatasi satu hal: terjemahan Indonesia (Kementerian Agama RI, lewat Tanzil) hanya boleh dipakai untuk tujuan **nonkomersial**. Karena itu Simak harus tetap gratis, tanpa iklan, dan tanpa monetisasi, kecuali ada izin dari penerjemah/penerbit. Teks Arab (Tanzil, CC BY 3.0), sumber audio rujukan, dan dependensi pihak ketiga dijelaskan di [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md); atribusi data Qur'an juga ada di [data/quran/NOTICE.md](data/quran/NOTICE.md).
+Pilihan lisensi dibatasi satu hal: terjemahan Indonesia (Kementerian Agama RI, lewat Tanzil) hanya boleh dipakai untuk tujuan **nonkomersial**. Karena itu Simak harus tetap gratis, tanpa iklan, dan tanpa monetisasi, kecuali ada izin dari penerjemah/penerbit. Teks Arab (Tanzil, CC BY 3.0), font Amiri Quran yang disertakan (SIL OFL 1.1, tanpa perubahan; teks lisensi di `src/assets/fonts/OFL.txt`), sumber audio rujukan, dan dependensi pihak ketiga dijelaskan di [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md); atribusi data Qur'an juga ada di [data/quran/NOTICE.md](data/quran/NOTICE.md).
 
 ## Tidak berafiliasi
 

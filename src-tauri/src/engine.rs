@@ -7,7 +7,7 @@ use crate::timeline::{Part, Timeline};
 use serde::Serialize;
 use std::time::Instant;
 
-#[derive(PartialEq, Eq, Debug, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum WidgetState {
     Waiting,
@@ -21,6 +21,9 @@ pub enum WidgetState {
 pub struct Engine {
     timelines: Vec<Timeline>,
     clock: PositionClock,
+    /// Identitas snapshot terakhir yang diterima `tick` (surah, sedang diputar);
+    /// None bila tick terakhir menghasilkan Waiting atau belum pernah ada tick.
+    accepted: Option<(u8, bool)>,
 }
 
 impl Engine {
@@ -28,6 +31,7 @@ impl Engine {
         Self {
             timelines,
             clock: PositionClock::new(),
+            accepted: None,
         }
     }
 
@@ -35,6 +39,7 @@ impl Engine {
         match Self::resolve(&self.timelines, snap.as_ref()) {
             Some((snap, timeline)) => {
                 self.clock.observe(snap, now);
+                self.accepted = Some((timeline.surah, snap.is_playing));
                 WidgetState::Showing {
                     surah: timeline.surah,
                     part: timeline.part_at(self.clock.position_ms(now)),
@@ -44,8 +49,26 @@ impl Engine {
             None => {
                 // Tidak ada track yang dikenali: buang jam agar tidak bocor ke track berikutnya.
                 self.clock = PositionClock::new();
+                self.accepted = None;
                 WidgetState::Waiting
             }
+        }
+    }
+
+    /// Evaluasi ulang keadaan dari snapshot terakhir yang diterima `tick` dan
+    /// prediksi jam pada `now`, TANPA `observe`: dipakai di antara dua poll agar
+    /// snapshot basi tidak me-re-anchor jam dan membekukan interpolasi.
+    pub fn refresh(&mut self, now: Instant) -> WidgetState {
+        let Some((surah, playing)) = self.accepted else {
+            return WidgetState::Waiting;
+        };
+        match self.timelines.iter().find(|t| t.surah == surah) {
+            Some(timeline) => WidgetState::Showing {
+                surah,
+                part: timeline.part_at(self.clock.position_ms(now)),
+                playing,
+            },
+            None => WidgetState::Waiting,
         }
     }
 
@@ -249,6 +272,73 @@ mod tests {
             e.tick(Some(snap("Surah Al Ikhlas", 30_000, 0, true)), t0 + ms(200)),
             showing(112, Part::Intro, true)
         );
+    }
+
+    #[test]
+    fn refresh_advances_with_clock_across_a_boundary() {
+        let mut e = engine();
+        let t0 = Instant::now();
+        // 9_950 ms = ayat 1; batas ayat 2 di 10_000 ms.
+        assert_eq!(
+            e.tick(Some(snap("Surah Al Ikhlas", 30_000, 9_950, true)), t0),
+            showing(112, Part::Ayah(1), true)
+        );
+        assert_eq!(e.refresh(t0 + ms(100)), showing(112, Part::Ayah(2), true));
+    }
+
+    #[test]
+    fn refresh_keeps_paused_state_frozen() {
+        let mut e = engine();
+        let t0 = Instant::now();
+        assert_eq!(
+            e.tick(Some(snap("Surah Al Ikhlas", 30_000, 9_950, false)), t0),
+            showing(112, Part::Ayah(1), false)
+        );
+        assert_eq!(
+            e.refresh(t0 + ms(5_000)),
+            showing(112, Part::Ayah(1), false)
+        );
+    }
+
+    #[test]
+    fn refresh_after_waiting_tick_is_waiting() {
+        let mut e = engine();
+        let t0 = Instant::now();
+        e.tick(Some(snap("Surah Al Ikhlas", 30_000, 9_950, true)), t0);
+        assert_eq!(e.tick(None, t0 + ms(50)), WidgetState::Waiting);
+        assert_eq!(e.refresh(t0 + ms(100)), WidgetState::Waiting);
+        // Judul tak dikenal juga menghasilkan Waiting, dan refresh mengikutinya.
+        e.tick(
+            Some(snap("Bohemian Rhapsody", 30_000, 0, true)),
+            t0 + ms(150),
+        );
+        assert_eq!(e.refresh(t0 + ms(200)), WidgetState::Waiting);
+    }
+
+    #[test]
+    fn refresh_before_any_tick_is_waiting() {
+        let mut e = engine();
+        assert_eq!(e.refresh(Instant::now()), WidgetState::Waiting);
+    }
+
+    #[test]
+    fn repeated_refresh_never_reanchors_to_stale_position() {
+        let mut e = engine();
+        let t0 = Instant::now();
+        // Satu poll di 0 ms (Intro), lalu hanya refresh tiap 50 ms selama 10 s.
+        e.tick(Some(snap("Surah Al Ikhlas", 30_000, 0, true)), t0);
+        let mut last = e.refresh(t0 + ms(50));
+        let mut ayah_changes = 0;
+        for step in 2..=200u64 {
+            let state = e.refresh(t0 + ms(step * 50));
+            if state != last {
+                ayah_changes += 1;
+                last = state;
+            }
+        }
+        // 10_000 ms: tepat di batas ayat 2 => Intro -> 1 (1000 ms) -> 2 (10_000 ms)
+        assert_eq!(ayah_changes, 2);
+        assert_eq!(last, showing(112, Part::Ayah(2), true));
     }
 
     #[test]

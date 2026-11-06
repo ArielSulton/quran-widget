@@ -9,7 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-cargo metadata --format-version 1 --locked --manifest-path src-tauri/Cargo.toml 2>/dev/null |
+cargo metadata --format-version 1 --locked --manifest-path src-tauri/Cargo.toml |
 python3 -I -c '
 import json, sys
 d = json.load(sys.stdin)

@@ -6,7 +6,7 @@ Simak (https://github.com/ArielSulton/quran-widget) memuat atau memakai karya pi
 
 - Sumber: Tanzil Quran Text, Uthmani, Versi 1.1, https://tanzil.net
 - Lisensi: Creative Commons Attribution 3.0 (CC BY 3.0). Pembaruan teks: http://tanzil.net/updates/
-- Berkas: `data/quran/juz30.json` (kunci `ar`).
+- Berkas: `data/quran/juz30.json` (kunci `ar`). Salinan atribusi ini juga ada di `data/quran/NOTICE.md`, di samping datanya.
 - Satu-satunya perubahan: teks dipecah ke JSON per surah/ayat, dan basmalah yang Tanzil letakkan di awal ayat 1 setiap surah dihapus dari ayat 1 (agar aplikasi dapat menampilkannya terpisah). Tidak ada huruf atau tanda baca ayat yang diubah.
 
 Blok hak cipta dan syarat penggunaan di bawah ini disalin apa adanya dari berkas sumber `quran-uthmani.txt` yang diunduh dari Tanzil:
@@ -74,7 +74,7 @@ Dependensi langsung (lisensi dibaca dari metadata `cargo metadata` dan `package-
 | serde | 1.0.229 | MIT OR Apache-2.0 | serialisasi |
 | serde_json | 1.0.154 | MIT OR Apache-2.0 | JSON |
 | mpris (Linux saja) | 2.1.0 | Apache-2.0 | membaca pemutaran lewat D-Bus MPRIS |
-| @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT | jembatan antarmuka ke Tauri |
+| @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT | jembatan antarmuka ke Tauri |
 | @tauri-apps/cli (build) | 2.12.4 | Apache-2.0 OR MIT | pembuatan installer dan ikon |
 | typescript (build) | 5.8.3 | Apache-2.0 | kompilasi antarmuka |
 | vite (build) | 7.3.7 | MIT | bundler antarmuka |

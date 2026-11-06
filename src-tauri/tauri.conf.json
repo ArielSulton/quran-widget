@@ -47,7 +47,8 @@
     "copyright": "© Simak contributors",
     "resources": {
       "../data/timing/": "data/timing/",
-      "../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md"
+      "../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md",
+      "../data/quran/NOTICE.md": "data/quran/NOTICE.md"
     },
     "macOS": {
       "entitlements": "Entitlements.plist"

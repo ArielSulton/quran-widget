@@ -161,6 +161,8 @@ def check_summary(path: Path, files: dict[int, dict], excluded: dict[int, str],
     notes = s.get("notes")
     if not isinstance(notes, dict) or "skipped" not in str(notes.get("crosscheck", "")):
         errs.append("_summary.json: notes.crosscheck must state that the Whisper cross-check was skipped")
+    elif "pending" not in str(notes["crosscheck"]):
+        errs.append("_summary.json: notes.crosscheck must say the listening verification is still pending")
     unresolved = s.get("unresolved")
     expected_unresolved = [{"surah": n, "issue": first_before_track[n]}
                            for n in sorted(first_before_track) if n in files]

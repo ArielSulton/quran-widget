@@ -6,8 +6,9 @@
 Pipeline per non-excluded surah (see tools/check_timing.py:EXCLUDED):
   1. ayah starts in the PUBLIC REFERENCE recording: tools/align.py ``align_surah_detail``
      (kept: its ``flags`` = low-confidence boundaries);
-  2. (Whisper cross-check: intentionally SKIPPED by user decision; the boundaries are verified by
-     listening to the clips of ``tools/spotcheck.py --flagged``; _summary.json says so.)
+  2. (Whisper cross-check: intentionally SKIPPED by user decision; the boundaries are still TO BE
+     verified by listening to the clips of ``tools/spotcheck.py --flagged`` (pending);
+     _summary.json says so.)
   3. offset = (time in Spotify) - (time in reference), chosen from the per-probe offsets in
      build/offsets/NNN.json (read-only input) by ``choose_offset`` below;
   4. spotify_duration_ms from tests/fixtures/spotify_titles.json.
@@ -47,8 +48,8 @@ CLUSTER_GAP_MS = 125      # single-linkage gap for offset clustering
 HIGH_MIN_SIZE = 3
 HIGH_MAX_SPREAD_MS = 150
 CLASSES = ("long", "short")
-CROSSCHECK_NOTE = ("Whisper cross-check intentionally skipped (user decision); boundaries are verified "
-                   "by listening to the clips from tools/spotcheck.py --flagged")
+CROSSCHECK_NOTE = ("Whisper cross-check intentionally skipped (user decision); boundaries are to be verified "
+                   "by listening to the clips from tools/spotcheck.py --flagged (pending: not yet done)")
 
 
 # ---------------------------------------------------------------------------------

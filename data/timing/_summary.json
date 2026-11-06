@@ -1,6 +1,6 @@
 {
  "notes": {
-  "crosscheck": "Whisper cross-check intentionally skipped (user decision); boundaries are verified by listening to the clips from tools/spotcheck.py --flagged"
+  "crosscheck": "Whisper cross-check intentionally skipped (user decision); boundaries are to be verified by listening to the clips from tools/spotcheck.py --flagged (pending: not yet done)"
  },
  "unresolved": [
   {

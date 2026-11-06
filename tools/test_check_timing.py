@@ -82,7 +82,7 @@ def _mini_world(tmp_path, monkeypatch):
     tdir = tmp_path / "timing"
     tdir.mkdir()
     _write(tdir, good())
-    summary = {"notes": {"crosscheck": "intentionally skipped"}, "unresolved": [], "class_modes": {"long": 1, "short": 2}, "excluded": {"113": {"reason": "r"}},
+    summary = {"notes": {"crosscheck": "intentionally skipped; listening check pending"}, "unresolved": [], "class_modes": {"long": 1, "short": 2}, "excluded": {"113": {"reason": "r"}},
                "surahs": {"112": {"offset_ms": 66, "confidence": "high", "ayah_count": 4,
                                   "spotify_duration_ms": 13000, "first_ayah_spotify_ms": 1066,
                                   "flagged_boundaries": [{"ayah": 2, "start_ms": 4000}]}}}
@@ -126,6 +126,9 @@ def test_check_dir_summary_must_state_crosscheck_skipped_and_carry_no_crosscheck
     del s["surahs"]["112"]["crosscheck"], s["notes"]
     (tdir / "_summary.json").write_text(json.dumps(s))
     assert any("notes.crosscheck" in e for e in ct.check(tdir, quran, titles, ex))
+    s["notes"] = {"crosscheck": "intentionally skipped; boundaries are verified by listening"}
+    (tdir / "_summary.json").write_text(json.dumps(s))
+    assert any("pending" in e for e in ct.check(tdir, quran, titles, ex))
 
 
 # ---- first ayah must not start before the Spotify track does ------------------------------

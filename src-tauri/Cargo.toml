@@ -3,6 +3,7 @@ name = "quran-widget"
 version = "0.1.0"
 description = "Simak: widget yang menampilkan ayat Al-Qur'an yang sedang dibacakan di Spotify"
 authors = ["Simak contributors"]
+license = "MIT"
 repository = "https://github.com/ArielSulton/quran-widget"
 homepage = "https://arielsulton.web.id/apps/simak"
 edition = "2021"

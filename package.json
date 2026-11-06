@@ -1,6 +1,7 @@
 {
   "name": "simak-ayat",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "description": "Simak: widget desktop yang menampilkan ayat Al-Qur'an yang sedang dibacakan di Spotify",
   "repository": {

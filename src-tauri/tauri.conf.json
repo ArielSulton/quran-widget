@@ -46,8 +46,11 @@
     "shortDescription": "Ayat Al-Qur'an yang sedang dibacakan di Spotify",
     "longDescription": "Simak adalah widget desktop kecil yang menampilkan ayat Al-Qur'an beserta terjemahan Indonesia (Kemenag) yang sedang dibacakan pada trek Juz 30 di aplikasi Spotify. Ayat berganti mengikuti posisi pemutaran.",
     "copyright": "© Simak contributors",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
     "resources": {
       "../data/timing/": "data/timing/",
+      "../LICENSE": "LICENSE",
       "../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md",
       "../data/quran/NOTICE.md": "data/quran/NOTICE.md",
       "../src/assets/fonts/OFL.txt": "licenses/AmiriQuran-OFL.txt"

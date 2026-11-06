@@ -1,4 +1,5 @@
 pub mod playback;
+pub mod surah;
 
 pub fn run() {
     tauri::Builder::default()

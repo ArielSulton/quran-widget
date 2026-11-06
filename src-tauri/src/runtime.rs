@@ -47,6 +47,20 @@ struct Poller {
     source: Box<dyn PlaybackSource>,
     clock: SharedClock,
     last_error: Option<SourceError>,
+    /// `poll()` pernah panik: sumber dianggap rusak dan tidak dipoll lagi (tanpa respawn);
+    /// widget tetap di Waiting dan loop berhenti seperti biasa lewat `stop`.
+    source_panicked: bool,
+}
+
+/// Teks muatan panik (`&str` atau `String`; selain itu penanda umum).
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "muatan panik tidak diketahui".to_string()
+    }
 }
 
 impl Poller {
@@ -55,12 +69,30 @@ impl Poller {
             source,
             clock,
             last_error: None,
+            source_panicked: false,
         }
     }
 
     fn poll_once(&mut self) -> PollResult {
         let before = (self.clock)();
-        let polled = self.source.poll();
+        let polled = if self.source_panicked {
+            Ok(None)
+        } else {
+            // Panik di dalam `poll()` tidak boleh mematikan thread poller diam-diam (widget akan
+            // menunggu selamanya tanpa jejak): tangkap, laporkan sekali, lalu anggap tak tersedia.
+            // `AssertUnwindSafe` aman di sini: setelah panik `source` tidak pernah disentuh lagi
+            // (`source_panicked`), dan `poll()` tidak memegang lock bersama, jadi tidak ada state
+            // setengah jadi yang bisa teramati atau lock yang teracuni.
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.source.poll()))
+                .unwrap_or_else(|payload| {
+                    self.source_panicked = true;
+                    eprintln!(
+                        "[runtime] sumber pemutaran panik: {}; dianggap tidak tersedia",
+                        panic_message(payload.as_ref())
+                    );
+                    Ok(None)
+                })
+        };
         let after = (self.clock)();
         let at = before + after.saturating_duration_since(before) / 2;
         // Galat sumber diperlakukan seperti Ok(None): widget menunggu.
@@ -638,6 +670,81 @@ mod tests {
             poll: ms(4),
             tick: ms(1),
         }
+    }
+
+    /// Sumber palsu yang mengembalikan satu snapshot lalu panik pada poll berikutnya.
+    struct PanickingSource {
+        polls: Arc<AtomicUsize>,
+    }
+
+    impl PlaybackSource for PanickingSource {
+        fn poll(&mut self) -> Result<Option<Snapshot>, SourceError> {
+            if self.polls.fetch_add(1, Ordering::SeqCst) == 0 {
+                Ok(Some(ikhlas(0, true)))
+            } else {
+                panic!("sumber rusak")
+            }
+        }
+    }
+
+    #[test]
+    fn panicking_poll_is_contained_yields_waiting_and_source_is_not_polled_again() {
+        let t0 = Instant::now();
+        let polls = Arc::new(AtomicUsize::new(0));
+        let source = Box::new(PanickingSource {
+            polls: polls.clone(),
+        });
+        let mut sim = Sim::new(source, Arc::new(Mutex::new(t0)));
+        for i in 0..4 {
+            sim.step(t0 + ms(i * 250), true);
+        }
+        assert_eq!(
+            sim.emitted,
+            vec![showing(Part::Intro, true), WidgetState::Waiting]
+        );
+        assert_eq!(
+            polls.load(Ordering::SeqCst),
+            2,
+            "sumber yang panik tidak dipoll lagi"
+        );
+    }
+
+    #[test]
+    fn run_loop_survives_a_panicking_source_emits_waiting_and_stops_cleanly() {
+        let polls = Arc::new(AtomicUsize::new(0));
+        let source = Box::new(PanickingSource {
+            polls: polls.clone(),
+        });
+        let stop = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = mpsc::channel();
+        let stop_in_loop = stop.clone();
+        let stop_for_loop = stop.clone();
+        let handle = std::thread::spawn(move || {
+            let mut emitted = Vec::new();
+            run_loop_with(
+                fast(),
+                source,
+                engine(),
+                |s| {
+                    if s == WidgetState::Waiting {
+                        stop_in_loop.store(true, Ordering::SeqCst);
+                    }
+                    emitted.push(s);
+                },
+                Instant::now,
+                stop_for_loop,
+                no_shift(),
+            );
+            tx.send(emitted).unwrap();
+        });
+        let emitted = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("loop harus berhenti bersih setelah sumber panik");
+        handle.join().expect("thread loop tidak boleh panik");
+        assert_eq!(
+            emitted,
+            vec![showing(Part::Intro, true), WidgetState::Waiting]
+        );
     }
 
     #[test]

@@ -88,11 +88,16 @@ def _label(surah: int, name: str, c: dict) -> str:
 
 
 PRIORITY_LAST_AYAH = (97,)   # surahs whose LAST-ayah clip is listened to first (very long previous ayah)
+# Known issue: the default offset of these surahs sits about 1 s away from the other surahs of the
+# same class (long/short track). The data is kept as measured; their FIRST-ayah clips are listened to
+# right after the unresolved/last-ayah entries. Offsets and class modes come from _summary.json.
+OUTLIER_SURAHS = (86, 93, 100, 107)
 
 
 def priority_clips(summary: dict, entries: list[dict], starts: dict[int, list[int]]) -> list[dict]:
     """Clips to listen to first: the first-ayah clip of every ``unresolved`` surah (first ayah
-    before the Spotify track starts), then the last-ayah clip of ``PRIORITY_LAST_AYAH`` surahs."""
+    before the Spotify track starts), then the last-ayah clip of ``PRIORITY_LAST_AYAH`` surahs, then
+    the first-ayah clip of every ``OUTLIER_SURAHS`` surah (default offset ~1 s off its class mode)."""
     by_surah = {e["surah"]: e for e in entries}
     out = []
     for u in summary.get("unresolved", []):
@@ -118,6 +123,18 @@ def priority_clips(summary: dict, entries: list[dict], starts: dict[int, list[in
                 f"masuk akal tetapi panjang. Klip ini = awal ayat {len(st)} (ayat terakhir), yaitu akhir "
                 f"ayat {len(st) - 1} yang panjang itu.")
         out.append({"surah": e["surah"], "name": e["name"], "ayah": len(st), "start_ms": clip["start_ms"],
+                    "file": clip["file"], "note": note})
+    for n in OUTLIER_SURAHS:
+        e = by_surah.get(n)
+        if e is None:
+            continue
+        info = summary["surahs"][f"{n:03d}"]
+        mode = summary["class_modes"][info["class"]]
+        clip = next(c for c in e["clips"] if c["ayah"] == 1)
+        note = (f"Offset bawaan {info['offset_ms']} ms berjarak {abs(info['offset_ms'] - mode)} ms dari surah "
+                f"sekelas lain (kelas {info['class']}, modus {mode} ms). Dengarkan apakah ayat muncul lebih awal "
+                f"atau lambat sekitar satu detik, lalu setel dengan geser sinkron.")
+        out.append({"surah": e["surah"], "name": e["name"], "ayah": 1, "start_ms": clip["start_ms"],
                     "file": clip["file"], "note": note})
     return out
 

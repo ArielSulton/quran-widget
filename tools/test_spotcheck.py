@@ -131,3 +131,51 @@ def test_priority_notes_from_summary_unresolved_and_extra():
     assert "-2960 ms" in prio[0]["note"] and "ayat 1" in prio[0]["note"]
     assert "Spotify starts 3.1 s into the reference" in prio[0]["note"]
     assert "ayat 4" in prio[1]["note"] and "25,1 detik" in prio[1]["note"]     # 43282-18160
+
+
+# ---- outlier surahs (default offset ~1 s away from siblings of the same class) --------------
+def _outlier_world():
+    summary = {"unresolved": [],
+               "class_modes": {"long": 4000, "short": 100},
+               "surahs": {"086": {"offset_ms": 3000, "class": "long"},
+                          "107": {"offset_ms": 1000, "class": "short"}}}
+    entries = [{"surah": 86, "name": "At-Tariq", "clips": [
+                   {"ayah": 1, "start_ms": 500, "reasons": ["first ayah"], "file": "86/f.wav"},
+                   {"ayah": 17, "start_ms": 60000, "reasons": ["last ayah"], "file": "86/l.wav"}]},
+               {"surah": 107, "name": "Al-Ma'un", "clips": [
+                   {"ayah": 1, "start_ms": 900, "reasons": ["first ayah"], "file": "107/f.wav"},
+                   {"ayah": 7, "start_ms": 20000, "reasons": ["last ayah"], "file": "107/l.wav"}]}]
+    return summary, entries
+
+
+def test_priority_lists_outlier_first_ayah_clips_with_numbers_from_summary(monkeypatch):
+    monkeypatch.setattr(spotcheck, "OUTLIER_SURAHS", (86, 107))
+    summary, entries = _outlier_world()
+    prio = spotcheck.priority_clips(summary, entries, {})
+    assert [(p["surah"], p["ayah"], p["file"]) for p in prio] == [(86, 1, "86/f.wav"), (107, 1, "107/f.wav")]
+    assert "3000 ms" in prio[0]["note"] and "4000 ms" in prio[0]["note"] and "1000 ms" in prio[0]["note"]
+    assert "long" in prio[0]["note"] and "geser sinkron" in prio[0]["note"]
+    assert "1000 ms" in prio[1]["note"] and "100 ms" in prio[1]["note"] and "900 ms" in prio[1]["note"]
+    assert "short" in prio[1]["note"]
+
+
+def test_outliers_come_after_unresolved_and_last_ayah_entries(monkeypatch):
+    monkeypatch.setattr(spotcheck, "OUTLIER_SURAHS", (86,))
+    monkeypatch.setattr(spotcheck, "PRIORITY_LAST_AYAH", (97,))
+    summary, entries = _outlier_world()
+    summary["unresolved"] = [{"surah": 78, "issue": "x"}]
+    summary["surahs"]["078"] = {"offset_ms": -3092, "first_ayah_spotify_ms": -2960}
+    entries = [{"surah": 78, "name": "An-Naba'", "clips": [{"ayah": 1, "start_ms": 132, "reasons": [], "file": "78/f.wav"}]},
+               {"surah": 97, "name": "Al-Qadr", "clips": [{"ayah": 5, "start_ms": 43282, "reasons": [], "file": "97/l.wav"}]},
+               entries[0]]
+    prio = spotcheck.priority_clips(summary, entries, {97: [48, 7528, 13168, 18160, 43282]})
+    assert [p["surah"] for p in prio] == [78, 97, 86]
+
+
+def test_outlier_surahs_exist_in_the_shipped_summary_and_are_off_their_class_mode():
+    import json
+    summary = json.loads((spotcheck.ROOT / "data" / "timing" / "_summary.json").read_text(encoding="utf-8"))
+    assert spotcheck.OUTLIER_SURAHS == (86, 93, 100, 107)
+    for n in spotcheck.OUTLIER_SURAHS:
+        e = summary["surahs"][f"{n:03d}"]
+        assert abs(e["offset_ms"] - summary["class_modes"][e["class"]]) > 700

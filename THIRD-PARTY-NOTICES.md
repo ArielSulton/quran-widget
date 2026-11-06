@@ -2,6 +2,8 @@
 
 Simak (https://github.com/ArielSulton/quran-widget) memuat atau memakai karya pihak ketiga berikut. Dokumen ini mengikuti persyaratan atribusi masing-masing sumber.
 
+Lisensi kode Simak sendiri: MIT (lihat `LICENSE`). Data Qur'an punya syarat sendiri, dijelaskan di bawah dan di `data/README.md`. (Simak's own code is licensed under MIT, see `LICENSE`; the Quran data keeps the separate terms below.)
+
 ## 1. Teks Al-Qur'an (Arab): Tanzil Project
 
 - Sumber: Tanzil Quran Text, Uthmani, Versi 1.1, https://tanzil.net

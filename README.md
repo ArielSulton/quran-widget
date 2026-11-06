@@ -31,6 +31,9 @@ Arahkan kursor ke widget (atau fokuskan dengan papan ketik) untuk memunculkan ko
 
 - **Tema:** Otomatis (mengikuti sistem), Terang, atau Gelap. Pilihan disimpan.
 - **Geser sinkron:** menggeser waktu ayat relatif terhadap suara, dari -2,0 sampai +2,0 detik. Tombol `-` / `+` melangkah 0,1 detik; tahan **Shift** untuk langkah 1 detik. Dari papan ketik: `[` mengurangi dan `]` menambah (juga dengan Shift). Klik dua kali pada nilai (atau Enter) untuk kembali ke 0. Tambah nilainya jika ayat muncul lebih cepat dari suara, kurangi jika terlambat. Pilihan disimpan.
+- **Ubah ukuran:** pegangan kecil (tiga garis miring) di pojok kanan bawah kartu muncul bersama kontrol. Seret untuk mengubah ukuran jendela. Dari papan ketik: fokuskan pegangan dengan Tab, lalu panah mengubah ukuran 10 px (dengan **Shift**: 50 px). Ukuran minimum 420 x 260 dan maksimum 2000 x 1200; bawaan 520 x 320.
+- **Ukuran tersimpan:** ukuran jendela diingat dan dipulihkan saat Simak dibuka lagi. Posisi jendela tidak disimpan.
+- **Font ikut membesar:** semakin besar jendela, teks Arab (sampai 1,6 kali pada jendela sekitar 960 x 560), terjemahan, dan footer ikut membesar secara proporsional. Pada jendela kecil dan ayat panjang, font Arab mengecil bertahap agar ayat tetap muat tanpa terpotong.
 
 Geser sinkron perlu karena posisi pemutaran yang dilaporkan Spotify bisa berbeda dari audio yang terdengar (lihat di bawah).
 
@@ -48,6 +51,8 @@ Geser sinkron perlu karena posisi pemutaran yang dilaporkan Spotify bisa berbeda
 - **Sinkron tidak sempurna.** Posisi yang dilaporkan Spotify bisa bergeser sekitar ±1 detik dari audio pada sebagian sistem. Gunakan geser sinkron untuk menyesuaikan.
 - **Baru Linux yang terverifikasi.** Sumber pemutaran macOS (osascript) dan Windows (SMTC) sudah diimplementasikan, tetapi belum diverifikasi di mesin asli: baru terbukti kompilasi dan lulus tes murni di CI. Karena itu build macOS/Windows bersifat eksperimental dan tidak ikut rilis biasa.
 - **Blur latar belum diverifikasi.** Blur tingkat sistem hanya dirancang untuk macOS (belum diuji). Di Linux tidak ada blur di belakang jendela, dan di Windows belum diverifikasi; tanpa blur, kartu memakai isian yang lebih pekat agar teks tetap terbaca di atas wallpaper apa pun, jadi tampilannya tidak semirip kaca seperti pada gambar di atas.
+- **Ukuran jendela minimum 420 x 260.** Lebih kecil dari itu tidak didukung: ayat terpanjang (surah 98 ayat 8) tidak lagi muat tanpa font yang terlalu kecil. Pada ukuran minimum dan bawaan, seluruh 564 ayat Juz 30 diperiksa muat tanpa terpotong (`node scripts/layout-sweep.mjs`, lihat bawah).
+- **Linux: compositing WebKit dimatikan.** Di jendela transparan pada WebKitGTK, sisa huruf atau kotak dari ayat sebelumnya bisa tertinggal di tepi kartu setelah ayat berganti (dipastikan di X11/GNOME, Intel/Mesa, WebKitGTK 2.50). Karena itu di Linux Simak menyetel `WEBKIT_DISABLE_COMPOSITING_MODE=1` sebelum WebKit dimulai. Kompromi: compositing GPU untuk tampilan web dimatikan, sehingga animasi bisa kurang mulus dan `backdrop-filter` tidak bisa diandalkan (Linux memang sudah memakai kartu solid tanpa blur). Bila variabel itu sudah Anda setel sendiri, nilai Anda dihormati. Untuk memilih keluar: `WEBKIT_DISABLE_COMPOSITING_MODE=0 simak`. Efek pada mesin lain belum diverifikasi.
 - Hanya Spotify di komputer yang sama; tidak untuk Spotify di HP atau perangkat lain.
 
 ## Membangun dari sumber
@@ -71,7 +76,9 @@ npm run tauri build    # bangun installer untuk OS ini
 
 Tes: `npx vitest run` (antarmuka) dan `cd src-tauri && cargo test -p quran-widget` (inti Rust). Pengembang yang memakai Rust 1.88 dan memperbarui `Cargo.lock` sebaiknya menyetel `CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback` agar dependensi yang dipilih cocok dengan versi Rust tersebut.
 
-Pratinjau antarmuka tanpa Tauri (di browser): `npm run dev`, lalu buka mis. `http://localhost:1420/?preview=ayah&surah=112&ayah=2&theme=dark&controls=1&backdrop=1`. Parameter: `preview=ayah|waiting|intro`, `surah`, `ayah`, `theme=auto|light|dark`, `sync` (ms), `controls=1`, `backdrop=1`, `material=native|css|solid`.
+Pratinjau antarmuka tanpa Tauri (di browser): `npm run dev`, lalu buka mis. `http://localhost:1420/?preview=ayah&surah=112&ayah=2&theme=dark&controls=1&backdrop=1`. Parameter: `preview=ayah|waiting|intro`, `surah`, `ayah`, `theme=auto|light|dark`, `sync` (ms), `controls=1` (memunculkan pil kontrol dan pegangan ubah ukuran), `backdrop=1`, `material=native|css|solid`. Di browser, pegangan ubah ukuran hanya tampil dan tidak bereaksi.
+
+Sapuan tata letak (opsional, tanpa dependensi npm; butuh `google-chrome` dan Node 22): `node scripts/layout-sweep.mjs` merender ke-564 ayat pada 420x260, 520x320, 720x420, dan 960x560 di Chrome tanpa kepala, mencetak jumlah ayat terpotong, dan gagal (kode keluar 1) bila ada yang terpotong pada 420x260 atau 520x320. Opsi: `--sizes`, `--assert`, `--shots DIR` (simpan PNG), `--theme dark`, `--url` (pakai server yang sudah berjalan; tanpa itu skrip menyalakan vite di port acak).
 
 ### Ikon
 
@@ -85,7 +92,7 @@ src-tauri/      aplikasi Tauri (Rust): sumber pemutaran, mesin ayat, jendela
 data/quran/     teks Arab dan terjemahan Juz 30 (JSON) + catatan lisensi
 data/timing/    tabel waktu ayat per surah (dihasilkan oleh tools/)
 tools/          alat Python untuk membangun dan memeriksa data waktu
-scripts/        skrip bantu (ikon, daftar lisensi dependensi)
+scripts/        skrip bantu (ikon, daftar lisensi dependensi, sapuan tata letak)
 docs/           gambar, spesifikasi, dan rencana
 ```
 

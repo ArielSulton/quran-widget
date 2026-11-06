@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0F5B4A"/>
+      <stop offset="1" stop-color="#1FA88A"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.11"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.45"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.18"/>
+    </linearGradient>
+    <clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="184"/></clipPath>
+    <filter id="tile-shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+      <feOffset dy="12" result="b"/>
+      <feFlood flood-color="#02201A" flood-opacity="0.38"/>
+      <feComposite in2="b" operator="in"/>
+    </filter>
+    <filter id="glyph-shadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
+      <feOffset dy="14" result="b"/>
+      <feFlood flood-color="#02201A" flood-opacity="0.35"/>
+      <feComposite in2="b" operator="in"/>
+    </filter>
+  </defs>
+
+  <!-- bayangan tile -->
+  <rect x="100" y="100" width="824" height="824" rx="184" filter="url(#tile-shadow)"/>
+  <!-- tile + gradien -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#bg)"/>
+  <!-- kilau kaca di bagian atas -->
+  <g clip-path="url(#tile)">
+    <rect x="100" y="100" width="824" height="371" fill="url(#gloss)"/>
+  </g>
+  <!-- tepi dalam halus -->
+  <rect x="101.5" y="101.5" width="821" height="821" rx="182.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <!-- huruf sin (path hasil konversi Amiri Bold, OFL) -->
+  <path d="M751.6 327.8Q755.9 311.7 769 325.3Q782 339 782 370Q782 430.2 759 466.2Q751.6 478 737.9 481.7Q710.6 489.1 676.5 463.7Q646.7 511.5 597.1 507.8Q595.2 532 590.9 554Q586.6 576 579.7 595.9Q566.7 634.3 532 661.6Q459.4 718.7 375.6 716.9Q271.4 714.4 245.3 621.3Q237.9 595.2 247.2 549.9Q252.1 527 261.1 502.5Q270.1 478 283.8 452.5Q288.1 444.5 294.3 447.6Q300.5 451.3 296.8 460Q266.4 532 273.2 555.5Q293.7 632.5 382.4 632.5Q511.5 633.1 563 555.5Q564.8 515.2 533.2 455Q527.6 444.5 531.3 436.4L557.4 388Q563 377.5 574.1 392.4Q579.7 399.8 585 408.5Q590.3 417.2 594.6 427.7Q662.3 437.6 680.9 358.2Q684.6 344.6 692.7 345.2Q706.3 347.1 699.5 383.7Q720.6 396.7 746 396.1Q746 393 739.8 383Q737.9 379.3 740.4 370Z" fill="#000000" filter="url(#glyph-shadow)"/>
+  <path d="M751.6 327.8Q755.9 311.7 769 325.3Q782 339 782 370Q782 430.2 759 466.2Q751.6 478 737.9 481.7Q710.6 489.1 676.5 463.7Q646.7 511.5 597.1 507.8Q595.2 532 590.9 554Q586.6 576 579.7 595.9Q566.7 634.3 532 661.6Q459.4 718.7 375.6 716.9Q271.4 714.4 245.3 621.3Q237.9 595.2 247.2 549.9Q252.1 527 261.1 502.5Q270.1 478 283.8 452.5Q288.1 444.5 294.3 447.6Q300.5 451.3 296.8 460Q266.4 532 273.2 555.5Q293.7 632.5 382.4 632.5Q511.5 633.1 563 555.5Q564.8 515.2 533.2 455Q527.6 444.5 531.3 436.4L557.4 388Q563 377.5 574.1 392.4Q579.7 399.8 585 408.5Q590.3 417.2 594.6 427.7Q662.3 437.6 680.9 358.2Q684.6 344.6 692.7 345.2Q706.3 347.1 699.5 383.7Q720.6 396.7 746 396.1Q746 393 739.8 383Q737.9 379.3 740.4 370Z" fill="#FFFFFF"/>
+</svg>

@@ -2,6 +2,12 @@
   "name": "simak-ayat",
   "private": true,
   "version": "0.1.0",
+  "description": "Simak: widget desktop yang menampilkan ayat Al-Qur'an yang sedang dibacakan di Spotify",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ArielSulton/quran-widget.git"
+  },
+  "homepage": "https://arielsulton.web.id/apps/simak",
   "type": "module",
   "scripts": {
     "dev": "vite",

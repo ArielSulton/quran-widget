@@ -7,7 +7,7 @@ pub mod timeline;
 
 use engine::{Engine, WidgetState};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
@@ -18,6 +18,16 @@ struct StopFlag(Arc<AtomicBool>);
 /// Keadaan terakhir yang dipancarkan, agar front end yang baru siap bisa mengambilnya
 /// (event pertama bisa terbit sebelum `listen` terdaftar).
 struct LatestState(Mutex<WidgetState>);
+
+/// Geser sinkron pengguna (ms) yang dibagikan antara perintah UI dan thread loop.
+struct SyncShift(Arc<AtomicI64>);
+
+/// Simpan geser sinkron (ms); loop runtime mengambilnya pada iterasi berikutnya (<= 50 ms)
+/// dan `Engine` menjepitnya ke ±2000.
+#[tauri::command]
+fn set_sync_shift_ms(ms: i64, shift: tauri::State<'_, SyncShift>) {
+    shift.0.store(ms, Ordering::SeqCst);
+}
 
 #[tauri::command]
 fn current_state(latest: tauri::State<'_, LatestState>) -> WidgetState {
@@ -48,11 +58,14 @@ fn stop_loop(app: &tauri::AppHandle) {
 
 pub fn run() {
     let stop = Arc::new(AtomicBool::new(false));
+    let shift = Arc::new(AtomicI64::new(0));
+    let loop_shift = shift.clone();
 
     let app = tauri::Builder::default()
         .manage(StopFlag(stop.clone()))
+        .manage(SyncShift(shift))
         .manage(LatestState(Mutex::new(WidgetState::Waiting)))
-        .invoke_handler(tauri::generate_handler![current_state])
+        .invoke_handler(tauri::generate_handler![current_state, set_sync_shift_ms])
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, WindowEvent::Destroyed) {
                 stop_loop(window.app_handle());
@@ -76,6 +89,7 @@ pub fn run() {
                     },
                     Instant::now,
                     stop,
+                    loop_shift,
                 );
             });
             Ok(())

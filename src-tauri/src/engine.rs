@@ -18,9 +18,15 @@ pub enum WidgetState {
     },
 }
 
+/// Batas mutlak geser sinkron pengguna (ms).
+pub const MAX_USER_SHIFT_MS: i64 = 2000;
+
 pub struct Engine {
     timelines: Vec<Timeline>,
     clock: PositionClock,
+    /// Geser sinkron pengguna (ms), sudah dijepit ke ±`MAX_USER_SHIFT_MS`.
+    /// Positif => pergantian ayat muncul LEBIH LAMBAT (layar mendahului suara).
+    user_shift_ms: i64,
     /// Identitas snapshot terakhir yang diterima `tick` (surah, sedang diputar);
     /// None bila tick terakhir menghasilkan Waiting atau belum pernah ada tick.
     accepted: Option<(u8, bool)>,
@@ -31,8 +37,20 @@ impl Engine {
         Self {
             timelines,
             clock: PositionClock::new(),
+            user_shift_ms: 0,
             accepted: None,
         }
+    }
+
+    /// Atur geser sinkron (ms), dijepit ke ±2000. Berlaku pada `tick`/`refresh` berikutnya.
+    pub fn set_user_shift_ms(&mut self, ms: i64) {
+        self.user_shift_ms = ms.clamp(-MAX_USER_SHIFT_MS, MAX_USER_SHIFT_MS);
+    }
+
+    /// Posisi jam pada `now` dikurangi geser; posisi efektif negatif dibulatkan ke 0 (Intro).
+    fn effective_position_ms(&self, now: Instant) -> u64 {
+        let position = i64::try_from(self.clock.position_ms(now)).unwrap_or(i64::MAX);
+        u64::try_from(position.saturating_sub(self.user_shift_ms)).unwrap_or(0)
     }
 
     pub fn tick(&mut self, snap: Option<Snapshot>, now: Instant) -> WidgetState {
@@ -42,7 +60,7 @@ impl Engine {
                 self.accepted = Some((timeline.surah, snap.is_playing));
                 WidgetState::Showing {
                     surah: timeline.surah,
-                    part: timeline.part_at(self.clock.position_ms(now)),
+                    part: timeline.part_at(self.effective_position_ms(now)),
                     playing: snap.is_playing,
                 }
             }
@@ -65,7 +83,7 @@ impl Engine {
         match self.timelines.iter().find(|t| t.surah == surah) {
             Some(timeline) => WidgetState::Showing {
                 surah,
-                part: timeline.part_at(self.clock.position_ms(now)),
+                part: timeline.part_at(self.effective_position_ms(now)),
                 playing,
             },
             None => WidgetState::Waiting,
@@ -339,6 +357,91 @@ mod tests {
         // 10_000 ms: tepat di batas ayat 2 => Intro -> 1 (1000 ms) -> 2 (10_000 ms)
         assert_eq!(ayah_changes, 2);
         assert_eq!(last, showing(112, Part::Ayah(2), true));
+    }
+
+    /// Linimasa uji geser sinkron: mulai ayat [2000, 10000, 20000], offset 500 ms
+    /// => ayat 2 dimulai pada posisi Spotify 10_500 ms tanpa geser.
+    fn shifted_engine(shift_ms: i64) -> Engine {
+        let mut e = Engine::new(vec![Timeline {
+            surah: 112,
+            spotify_duration_ms: 30_000,
+            offset_ms: 500,
+            ayah_starts_ms: vec![2000, 10_000, 20_000],
+        }]);
+        e.set_user_shift_ms(shift_ms);
+        e
+    }
+
+    /// Ayat yang tampil untuk posisi Spotify `pos` (tick pertama, jam baru).
+    fn part_via_tick(shift_ms: i64, pos: u64) -> Part {
+        let mut e = shifted_engine(shift_ms);
+        match e.tick(
+            Some(snap("Surah Al Ikhlas", 30_000, pos, true)),
+            Instant::now(),
+        ) {
+            WidgetState::Showing { part, .. } => part,
+            other => panic!("diharapkan Showing, dapat {other:?}"),
+        }
+    }
+
+    #[test]
+    fn user_shift_zero_changes_ayah_exactly_at_10500() {
+        assert_eq!(part_via_tick(0, 10_499), Part::Ayah(1));
+        assert_eq!(part_via_tick(0, 10_500), Part::Ayah(2));
+    }
+
+    #[test]
+    fn positive_shift_delays_the_transition() {
+        assert_eq!(part_via_tick(300, 10_799), Part::Ayah(1));
+        assert_eq!(part_via_tick(300, 10_800), Part::Ayah(2));
+    }
+
+    #[test]
+    fn negative_shift_advances_the_transition() {
+        assert_eq!(part_via_tick(-300, 10_199), Part::Ayah(1));
+        assert_eq!(part_via_tick(-300, 10_200), Part::Ayah(2));
+    }
+
+    #[test]
+    fn shift_is_clamped_to_plus_minus_2000() {
+        assert_eq!(part_via_tick(5000, 12_499), Part::Ayah(1));
+        assert_eq!(part_via_tick(5000, 12_500), Part::Ayah(2));
+        assert_eq!(part_via_tick(-5000, 8_499), Part::Ayah(1));
+        assert_eq!(part_via_tick(-5000, 8_500), Part::Ayah(2));
+        assert_eq!(part_via_tick(i64::MIN, 8_500), Part::Ayah(2));
+        assert_eq!(part_via_tick(i64::MAX, 12_500), Part::Ayah(2));
+    }
+
+    #[test]
+    fn positive_shift_larger_than_position_is_intro_not_a_panic() {
+        // posisi efektif negatif (100 - 2000) => seperti sebelum rekaman dimulai
+        assert_eq!(part_via_tick(2000, 100), Part::Intro);
+        assert_eq!(part_via_tick(2000, 0), Part::Intro);
+    }
+
+    #[test]
+    fn refresh_agrees_with_tick_under_shift() {
+        for shift in [0i64, 300, -300, 5000, -5000] {
+            let mut e = shifted_engine(shift);
+            let t0 = Instant::now();
+            // 10_000 ms dilaporkan pada t0; 500 ms kemudian jam di 10_500 ms.
+            e.tick(Some(snap("Surah Al Ikhlas", 30_000, 10_000, true)), t0);
+            let via_refresh = e.refresh(t0 + ms(500));
+            let expected = part_via_tick(shift, 10_500);
+            assert_eq!(via_refresh, showing(112, expected, true), "shift {shift}");
+        }
+    }
+
+    #[test]
+    fn changing_the_shift_applies_to_the_next_refresh_without_a_new_tick() {
+        let mut e = shifted_engine(0);
+        let t0 = Instant::now();
+        e.tick(Some(snap("Surah Al Ikhlas", 30_000, 10_600, true)), t0);
+        assert_eq!(e.refresh(t0), showing(112, Part::Ayah(2), true));
+        e.set_user_shift_ms(300); // efektif 10_300 < 10_500
+        assert_eq!(e.refresh(t0), showing(112, Part::Ayah(1), true));
+        e.set_user_shift_ms(-300); // efektif 10_900
+        assert_eq!(e.refresh(t0), showing(112, Part::Ayah(2), true));
     }
 
     #[test]

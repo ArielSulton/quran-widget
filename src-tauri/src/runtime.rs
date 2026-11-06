@@ -4,7 +4,7 @@ use crate::engine::{Engine, WidgetState};
 use crate::playback::{PlaybackSource, Snapshot, SourceError};
 use crate::timeline::Timeline;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
@@ -84,15 +84,21 @@ impl Poller {
 /// Satu langkah loop yang deterministik (waktu dan hasil poll disuntikkan).
 struct Stepper {
     engine: Engine,
+    /// Geser sinkron pengguna yang dibagikan dengan thread UI (perintah Tauri).
+    shift: Arc<AtomicI64>,
+    /// Nilai geser yang sudah diteruskan ke `engine`.
+    applied_shift: i64,
     started: Option<Instant>,
     last_fresh: Option<Instant>,
     last_emitted: Option<WidgetState>,
 }
 
 impl Stepper {
-    fn new(engine: Engine) -> Self {
+    fn new(engine: Engine, shift: Arc<AtomicI64>) -> Self {
         Self {
             engine,
+            shift,
+            applied_shift: 0,
             started: None,
             last_fresh: None,
             // Keadaan awal widget adalah Waiting: tidak perlu dipancarkan ulang.
@@ -108,6 +114,13 @@ impl Stepper {
         emit: &mut impl FnMut(WidgetState),
     ) {
         let started = *self.started.get_or_insert(now);
+        // Geser baru langsung berlaku di langkah ini (juga tanpa poll segar): semua cabang
+        // di bawah menghitung keadaan dengan geser terbaru, dan perubahan dipancarkan.
+        let shift = self.shift.load(Ordering::SeqCst);
+        if shift != self.applied_shift {
+            self.applied_shift = shift;
+            self.engine.set_user_shift_ms(shift);
+        }
         let state = if let Some(result) = fresh {
             self.last_fresh = Some(now);
             // Jangkarkan di instan baca (titik tengah), lalu prediksi sampai `now`.
@@ -127,14 +140,27 @@ impl Stepper {
 }
 
 /// Jalankan loop dengan irama bawaan (poll 250 ms, tick 50 ms) sampai `stop` diset.
+///
+/// `shift` = geser sinkron pengguna (ms, boleh negatif) yang dibaca tiap iterasi dan
+/// diteruskan ke `Engine::set_user_shift_ms` bila berubah; perubahan langsung dievaluasi
+/// ulang dan dipancarkan tanpa menunggu poll berikutnya.
 pub fn run_loop(
     source: Box<dyn PlaybackSource>,
     engine: Engine,
     emit: impl FnMut(WidgetState),
     clock: impl Fn() -> Instant + Send + Sync + 'static,
     stop: Arc<AtomicBool>,
+    shift: Arc<AtomicI64>,
 ) {
-    run_loop_with(LoopTiming::default(), source, engine, emit, clock, stop)
+    run_loop_with(
+        LoopTiming::default(),
+        source,
+        engine,
+        emit,
+        clock,
+        stop,
+        shift,
+    )
 }
 
 /// Seperti `run_loop` dengan irama yang dapat diatur (dipakai tes).
@@ -151,6 +177,7 @@ pub fn run_loop_with(
     emit: impl FnMut(WidgetState),
     clock: impl Fn() -> Instant + Send + Sync + 'static,
     stop: Arc<AtomicBool>,
+    shift: Arc<AtomicI64>,
 ) {
     let mut emit = emit;
     let clock: SharedClock = Arc::new(clock);
@@ -165,7 +192,7 @@ pub fn run_loop_with(
         })
     };
 
-    let mut stepper = Stepper::new(engine);
+    let mut stepper = Stepper::new(engine, shift);
     while !stop.load(Ordering::SeqCst) {
         let fresh = rx.try_iter().last();
         stepper.step(clock(), fresh, &mut emit);
@@ -367,6 +394,7 @@ mod tests {
         clock: Arc<Mutex<Instant>>,
         poller: Poller,
         stepper: Stepper,
+        shift: Arc<AtomicI64>,
         emitted: Vec<WidgetState>,
     }
 
@@ -376,10 +404,12 @@ mod tests {
                 let clock = clock.clone();
                 Arc::new(move || *clock.lock().unwrap())
             };
+            let shift = Arc::new(AtomicI64::new(0));
             Self {
                 clock,
                 poller: Poller::new(source, shared),
-                stepper: Stepper::new(engine()),
+                stepper: Stepper::new(engine(), shift.clone()),
+                shift,
                 emitted: Vec::new(),
             }
         }
@@ -542,6 +572,67 @@ mod tests {
         );
     }
 
+    #[test]
+    fn shift_change_between_polls_reemits_without_a_new_poll() {
+        // Poll di 10_100 ms (ayat 2, timeline uji offset 0). Geser +300 => efektif 9_800 => ayat 1.
+        let (mut sim, t0, polls) = sim(vec![Ok(Some(ikhlas(10_100, false)))]);
+        sim.step(t0, true);
+        assert_eq!(sim.emitted, vec![showing(Part::Ayah(2), false)]);
+        sim.shift.store(300, Ordering::SeqCst);
+        sim.step(t0 + ms(50), false);
+        assert_eq!(
+            sim.emitted,
+            vec![showing(Part::Ayah(2), false), showing(Part::Ayah(1), false)]
+        );
+        // Geser negatif besar (dijepit -2000) => efektif 12_100 => tetap ayat 2.
+        sim.shift.store(-9_999, Ordering::SeqCst);
+        sim.step(t0 + ms(100), false);
+        assert_eq!(sim.emitted.last(), Some(&showing(Part::Ayah(2), false)));
+        assert_eq!(sim.emitted.len(), 3);
+        // Nilai yang sama berulang tidak memancarkan ulang.
+        sim.step(t0 + ms(150), false);
+        assert_eq!(sim.emitted.len(), 3);
+        assert_eq!(polls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn run_loop_applies_a_shift_stored_between_polls_without_waiting_for_one() {
+        // Poll sangat jarang (10 s): emit kedua hanya mungkin dari re-evaluasi geser.
+        let (source, polls) = FakeSource::new(vec![Ok(Some(ikhlas(10_100, false)))]);
+        let stop = Arc::new(AtomicBool::new(false));
+        let shift = Arc::new(AtomicI64::new(0));
+        let (stop_in_emit, shift_in_emit) = (stop.clone(), shift.clone());
+        let mut emitted = Vec::new();
+        let timing = LoopTiming {
+            poll: Duration::from_secs(10),
+            tick: ms(1),
+        };
+        run_loop_with(
+            timing,
+            source,
+            engine(),
+            |s| {
+                emitted.push(s);
+                match emitted.len() {
+                    1 => shift_in_emit.store(300, Ordering::SeqCst),
+                    _ => stop_in_emit.store(true, Ordering::SeqCst),
+                }
+            },
+            Instant::now,
+            stop,
+            shift,
+        );
+        assert_eq!(
+            emitted,
+            vec![showing(Part::Ayah(2), false), showing(Part::Ayah(1), false)]
+        );
+        assert_eq!(polls.load(Ordering::SeqCst), 1);
+    }
+
+    fn no_shift() -> Arc<AtomicI64> {
+        Arc::new(AtomicI64::new(0))
+    }
+
     fn fast() -> LoopTiming {
         LoopTiming {
             poll: ms(4),
@@ -561,6 +652,7 @@ mod tests {
             |s| emitted.push(s),
             Instant::now,
             stop,
+            no_shift(),
         );
         assert!(emitted.is_empty());
         assert_eq!(polls.load(Ordering::SeqCst), 0);
@@ -582,6 +674,7 @@ mod tests {
             },
             Instant::now,
             stop,
+            no_shift(),
         );
         assert_eq!(emitted, vec![showing(Part::Intro, true)]);
     }
@@ -608,6 +701,7 @@ mod tests {
             },
             Instant::now,
             stop,
+            no_shift(),
         );
         assert_eq!(emitted, vec![showing(Part::Intro, true)]);
     }
@@ -661,7 +755,15 @@ mod tests {
             tick: ms(2),
         };
         let mut emitted = Vec::new();
-        run_loop_with(timing, source, engine(), |s| emitted.push(s), clock, stop);
+        run_loop_with(
+            timing,
+            source,
+            engine(),
+            |s| emitted.push(s),
+            clock,
+            stop,
+            no_shift(),
+        );
         assert_eq!(emitted, vec![showing(Part::Ayah(1), true)]);
     }
 
@@ -718,6 +820,7 @@ mod tests {
             },
             Instant::now,
             stop,
+            no_shift(),
         );
         let took = started.elapsed();
         drop(release_tx);
@@ -764,7 +867,15 @@ mod tests {
             std::thread::sleep(ms(60));
             stopper.store(true, Ordering::SeqCst);
         });
-        run_loop_with(fast(), source, engine(), |_| {}, Instant::now, stop);
+        run_loop_with(
+            fast(),
+            source,
+            engine(),
+            |_| {},
+            Instant::now,
+            stop,
+            no_shift(),
+        );
         // Sumber hidup di thread poller: sudah dibuang berarti thread itu sudah di-join.
         assert!(dropped.load(Ordering::SeqCst));
     }
@@ -784,7 +895,15 @@ mod tests {
             stopper.store(true, Ordering::SeqCst);
         });
         let started = Instant::now();
-        run_loop_with(fast(), source, engine(), |_| {}, Instant::now, stop);
+        run_loop_with(
+            fast(),
+            source,
+            engine(),
+            |_| {},
+            Instant::now,
+            stop,
+            no_shift(),
+        );
         let took = started.elapsed();
         assert!(
             took < ms(1_500),
@@ -813,7 +932,15 @@ mod tests {
             poll: ms(50),
             tick: ms(5),
         };
-        run_loop_with(timing, source, engine(), |_| {}, Instant::now, stop);
+        run_loop_with(
+            timing,
+            source,
+            engine(),
+            |_| {},
+            Instant::now,
+            stop,
+            no_shift(),
+        );
         let n = polls.load(Ordering::SeqCst);
         // ~300 ms / 50 ms = 6 poll (+1 awal); batas atas ketat, batas bawah longgar.
         assert!((2..=8).contains(&n), "jumlah poll {n}");

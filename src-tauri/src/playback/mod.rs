@@ -1,9 +1,20 @@
 //! Sumber pemutaran: membaca judul/posisi track Spotify yang sedang diputar.
 
+// Logika murni (parser/pemetaan) dikompilasi di semua OS agar teruji di Linux;
+// hanya pemanggilan OS yang dibatasi `cfg`.
+pub mod macos_parse;
+pub mod process;
+
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::LinuxSource;
+
+// `self::` karena nama modul `windows` bentrok dengan crate `windows` di prelude ekstern.
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub use self::macos::MacSource;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
@@ -33,15 +44,15 @@ pub trait PlaybackSource: Send {
     fn poll(&mut self) -> Result<Option<Snapshot>, SourceError>;
 }
 
-/// Stub untuk OS yang belum didukung (macOS/Windows menyusul di Task 10).
-#[cfg(not(target_os = "linux"))]
+/// Stub untuk OS yang tidak didukung (bukan Linux/macOS/Windows, mis. FreeBSD).
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 pub struct UnsupportedSource;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 impl PlaybackSource for UnsupportedSource {
     fn poll(&mut self) -> Result<Option<Snapshot>, SourceError> {
         Err(SourceError::Unavailable(
-            "sumber pemutaran untuk OS ini belum diimplementasikan (not implemented yet)".into(),
+            "sumber pemutaran untuk OS ini tidak didukung (hanya Linux, macOS, Windows)".into(),
         ))
     }
 }
@@ -52,7 +63,11 @@ pub fn default_source() -> Box<dyn PlaybackSource> {
     {
         Box::new(LinuxSource::new())
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
+    {
+        Box::new(MacSource::new())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         Box::new(UnsupportedSource)
     }

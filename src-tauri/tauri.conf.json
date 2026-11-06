@@ -49,6 +49,9 @@
       "../data/timing/": "data/timing/",
       "../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md"
     },
+    "macOS": {
+      "entitlements": "Entitlements.plist"
+    },
     "linux": {
       "deb": { "depends": ["libwebkit2gtk-4.1-0"] }
     }

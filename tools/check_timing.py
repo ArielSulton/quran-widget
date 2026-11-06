@@ -5,8 +5,9 @@
 
 Per ``NNN.json`` (the 4 keys of the Rust ``Timeline``): exactly those keys, ``surah`` equals
 the file name, the ayah count equals data/quran/juz30.json, starts strictly increasing with
-gaps >= 500 ms, last start + offset < spotify_duration, |offset| <= 10 s, spotify_duration
-equal to tests/fixtures/spotify_titles.json.  Exactly the surahs of Juz 30 minus ``EXCLUDED``
+gaps >= 500 ms, last start + offset < spotify_duration, first start + offset >= 0 (ayah 1 may not
+begin before the Spotify track does, except the documented ``FIRST_AYAH_BEFORE_TRACK``
+exceptions, which must be exact), |offset| <= 10 s, spotify_duration equal to tests/fixtures/spotify_titles.json.  Exactly the surahs of Juz 30 minus ``EXCLUDED``
 must be present, and ``_summary.json`` must agree with the files.  Prints ``OK`` and the
 excluded surahs (to be reported to the user), or every problem found, exit 1.
 """
@@ -32,12 +33,24 @@ EXCLUDED = {
          "reference 41.5 s): the reference ayah times do not apply to it",
 }
 
+# Surahs whose first ayah starts BEFORE the Spotify track does (first start + offset < 0), i.e.
+# the Spotify version begins inside the reference recording.  Exact: the check fails if a surah
+# is listed but does not need it, and if any other surah violates the rule.  Each entry is an
+# unresolved item that is reported in _summary.json ("unresolved").
+FIRST_AYAH_BEFORE_TRACK = {
+    78: "The Spotify track begins about 3.1 s into the reference recording (offset -3092 ms, five "
+        "tight probes), so ayah 1 (reference 132 ms) is already in progress at Spotify position 0. "
+        "UNRESOLVED: confirm by listening to build/spotcheck_flagged/78/s078_a01_at_132ms_first.wav "
+        "and to the start of the Spotify track.",
+}
+
 
 def _is_int(x) -> bool:
     return isinstance(x, int) and not isinstance(x, bool)
 
 
-def check_file(path: Path, ayah_count: int, spotify_ms: int) -> list[str]:
+def check_file(path: Path, ayah_count: int, spotify_ms: int,
+               first_before_track: str | None = None) -> list[str]:
     name = path.name
     errs: list[str] = []
     try:
@@ -69,6 +82,15 @@ def check_file(path: Path, ayah_count: int, spotify_ms: int) -> list[str]:
             errs.append(f"{name}: ayah {i + 1} start {starts[i]} is not after {starts[i - 1]}")
         elif gap < MIN_GAP_MS:
             errs.append(f"{name}: ayah {i}->{i + 1} gap {gap} ms < {MIN_GAP_MS} ms")
+    if starts:
+        first_spotify = starts[0] + d["offset_ms"]
+        if first_spotify < 0 and first_before_track is None:
+            errs.append(f"{name}: first ayah starts at Spotify {first_spotify} ms, before the Spotify "
+                        f"track starts (first start {starts[0]} + offset {d['offset_ms']} < 0); wrong "
+                        f"offset sign? or add a documented FIRST_AYAH_BEFORE_TRACK exception")
+        elif first_spotify >= 0 and first_before_track is not None:
+            errs.append(f"{name}: FIRST_AYAH_BEFORE_TRACK exception is not needed "
+                        f"(first ayah at Spotify {first_spotify} ms)")
     if abs(d["offset_ms"]) > MAX_ABS_OFFSET_MS:
         errs.append(f"{name}: |offset_ms| {d['offset_ms']} > {MAX_ABS_OFFSET_MS}")
     if starts and starts[-1] + d["offset_ms"] >= d["spotify_duration_ms"]:
@@ -80,8 +102,10 @@ def check_file(path: Path, ayah_count: int, spotify_ms: int) -> list[str]:
 
 
 def check(timing_dir: Path = TIMING_DIR, quran_path: Path | None = None,
-          titles_path: Path | None = None, excluded: dict[int, str] | None = None) -> list[str]:
+          titles_path: Path | None = None, excluded: dict[int, str] | None = None,
+          first_before_track: dict[int, str] | None = None) -> list[str]:
     excluded = EXCLUDED if excluded is None else excluded
+    first_before_track = FIRST_AYAH_BEFORE_TRACK if first_before_track is None else first_before_track
     quran = json.loads((quran_path or ROOT / "data" / "quran" / "juz30.json").read_text(encoding="utf-8"))
     titles = json.loads((titles_path or ROOT / "tests" / "fixtures" / "spotify_titles.json")
                         .read_text(encoding="utf-8"))
@@ -99,20 +123,26 @@ def check(timing_dir: Path = TIMING_DIR, quran_path: Path | None = None,
     for n in sorted(set(found) - expected):
         errs.append(f"{n:03d}.json present but surah {n} is "
                     f"{'excluded' if n in excluded else 'outside Juz 30'}")
+    for n, reason in first_before_track.items():
+        if n not in expected or n not in found or not reason.strip():
+            errs.append(f"FIRST_AYAH_BEFORE_TRACK exception for surah {n}: must be a shipped surah "
+                        f"with a non-empty reason")
     files: dict[int, dict] = {}
     for n in sorted(expected & set(found)):
         if str(n) not in quran or n not in spotify:
             errs.append(f"{n:03d}: no ayat in juz30.json or no duration in spotify_titles.json")
             continue
-        e = check_file(found[n], len(quran[str(n)]["ayat"]), spotify[n])
+        e = check_file(found[n], len(quran[str(n)]["ayat"]), spotify[n], first_before_track.get(n))
         errs += e
         if not e:
             files[n] = json.loads(found[n].read_text(encoding="utf-8"))
-    errs += check_summary(timing_dir / "_summary.json", files, excluded)
+    errs += check_summary(timing_dir / "_summary.json", files, excluded, first_before_track)
     return errs
 
 
-def check_summary(path: Path, files: dict[int, dict], excluded: dict[int, str]) -> list[str]:
+def check_summary(path: Path, files: dict[int, dict], excluded: dict[int, str],
+                  first_before_track: dict[int, str] | None = None) -> list[str]:
+    first_before_track = FIRST_AYAH_BEFORE_TRACK if first_before_track is None else first_before_track
     if not path.exists():
         return ["_summary.json is missing"]
     try:
@@ -131,8 +161,16 @@ def check_summary(path: Path, files: dict[int, dict], excluded: dict[int, str]) 
     notes = s.get("notes")
     if not isinstance(notes, dict) or "skipped" not in str(notes.get("crosscheck", "")):
         errs.append("_summary.json: notes.crosscheck must state that the Whisper cross-check was skipped")
+    unresolved = s.get("unresolved")
+    expected_unresolved = [{"surah": n, "issue": first_before_track[n]}
+                           for n in sorted(first_before_track) if n in files]
+    if unresolved != expected_unresolved:
+        errs.append(f"_summary.json: 'unresolved' must be exactly {expected_unresolved!r}, got {unresolved!r}")
     for n, d in files.items():
         e = per[f"{n:03d}"]
+        if e.get("first_ayah_spotify_ms") != d["ayah_starts_ms"][0] + d["offset_ms"]:
+            errs.append(f"_summary.json {n:03d}: first_ayah_spotify_ms {e.get('first_ayah_spotify_ms')} "
+                        f"!= first start + offset {d['ayah_starts_ms'][0] + d['offset_ms']}")
         if e.get("offset_ms") != d["offset_ms"]:
             errs.append(f"_summary.json {n:03d}: offset_ms {e.get('offset_ms')} != file {d['offset_ms']}")
         if e.get("ayah_count") != len(d["ayah_starts_ms"]):
@@ -159,6 +197,9 @@ def main() -> int:
         return 1
     n = len([p for p in TIMING_DIR.glob("*.json") if re.match(r"^\d{3}\.json$", p.name)])
     print(f"OK: {n} timing files")
+    print("unresolved (first ayah before the Spotify track starts; confirm by listening):")
+    for k, v in sorted(FIRST_AYAH_BEFORE_TRACK.items()):
+        print(f"  {k}: {v}")
     print("excluded from v1 (the widget shows the waiting state for these):")
     for k, v in sorted(EXCLUDED.items()):
         print(f"  {k}: {v}")

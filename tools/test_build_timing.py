@@ -189,3 +189,26 @@ def test_assemble_refuses_missing_probe_file():
     del inp["probes"][90]
     with pytest.raises(ValueError, match="90"):
         bt.assemble(inp, cache)
+
+
+def test_assemble_adds_first_ayah_spotify_ms_and_unresolved(monkeypatch):
+    inp, cache = _fake_inputs_and_cache()
+    monkeypatch.setattr(bt.check_timing, "FIRST_AYAH_BEFORE_TRACK", {112: "starts inside the reference"})
+    cache[112]["starts_ms"] = [20, 5000]          # 20 + 66 >= 0 : exception would be "not needed", assemble only reports
+    timings, summary = bt.assemble(inp, cache)
+    assert summary["surahs"]["112"]["first_ayah_spotify_ms"] == 86
+    assert summary["surahs"]["090"]["first_ayah_spotify_ms"] == 1000 + 110
+    assert summary["unresolved"] == [{"surah": 112, "issue": "starts inside the reference"}]
+
+
+def test_assemble_unresolved_empty_without_exceptions(monkeypatch):
+    inp, cache = _fake_inputs_and_cache()
+    monkeypatch.setattr(bt.check_timing, "FIRST_AYAH_BEFORE_TRACK", {})
+    assert bt.assemble(inp, cache)[1]["unresolved"] == []
+
+
+def test_cache_key_contains_aligner_version(tmp_path):
+    mp3 = tmp_path / "x.mp3"; mp3.write_bytes(b"abc")
+    k = bt._cache_key(str(mp3), ["a"])
+    assert k["align_version"] == bt.ALIGN_CACHE_VERSION
+    assert isinstance(bt.ALIGN_CACHE_VERSION, int)

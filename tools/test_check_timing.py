@@ -78,12 +78,13 @@ def _mini_world(tmp_path, monkeypatch):
     titles.write_text(json.dumps([{"surah": 112, "title": "x", "duration_ms": 13000},
                                   {"surah": 113, "title": "y", "duration_ms": 21000}]), encoding="utf-8")
     monkeypatch.setattr(ct, "SURAHS", range(112, 114))
+    monkeypatch.setattr(ct, "FIRST_AYAH_BEFORE_TRACK", {})
     tdir = tmp_path / "timing"
     tdir.mkdir()
     _write(tdir, good())
-    summary = {"notes": {"crosscheck": "intentionally skipped"}, "class_modes": {"long": 1, "short": 2}, "excluded": {"113": {"reason": "r"}},
+    summary = {"notes": {"crosscheck": "intentionally skipped"}, "unresolved": [], "class_modes": {"long": 1, "short": 2}, "excluded": {"113": {"reason": "r"}},
                "surahs": {"112": {"offset_ms": 66, "confidence": "high", "ayah_count": 4,
-                                  "spotify_duration_ms": 13000,
+                                  "spotify_duration_ms": 13000, "first_ayah_spotify_ms": 1066,
                                   "flagged_boundaries": [{"ayah": 2, "start_ms": 4000}]}}}
     (tdir / "_summary.json").write_text(json.dumps(summary), encoding="utf-8")
     return tdir, quran, titles, {113: "different recording of enough length"}
@@ -125,3 +126,77 @@ def test_check_dir_summary_must_state_crosscheck_skipped_and_carry_no_crosscheck
     del s["surahs"]["112"]["crosscheck"], s["notes"]
     (tdir / "_summary.json").write_text(json.dumps(s))
     assert any("notes.crosscheck" in e for e in ct.check(tdir, quran, titles, ex))
+
+
+# ---- first ayah must not start before the Spotify track does ------------------------------
+def negative_first():
+    d = good()
+    d["offset_ms"] = -1500          # first start 1000 + (-1500) = -500 < 0
+    return d
+
+
+def test_first_ayah_before_track_start_fails_without_exception(tmp_path):
+    errs = ct.check_file(_write(tmp_path, negative_first()), 4, 13000)
+    assert any("before the Spotify track starts" in e for e in errs)
+
+
+def test_sign_flipped_real_offset_is_caught(tmp_path):
+    real = json.loads((ct.TIMING_DIR / "080.json").read_text())
+    real["offset_ms"] = -real["offset_ms"]          # +4322 flipped to -4322
+    p = _write(tmp_path, real, "080.json")
+    errs = ct.check_file(p, len(real["ayah_starts_ms"]), real["spotify_duration_ms"])
+    assert any("before the Spotify track starts" in e for e in errs)
+
+
+def test_listed_exception_allows_the_violation(tmp_path):
+    p = _write(tmp_path, negative_first())
+    assert ct.check_file(p, 4, 13000, first_before_track="documented reason") == []
+
+
+def test_unneeded_exception_fails(tmp_path):
+    p = _write(tmp_path, good())
+    errs = ct.check_file(p, 4, 13000, first_before_track="documented reason")
+    assert any("exception" in e and "not needed" in e for e in errs)
+
+
+def test_boundary_first_start_plus_offset_zero_is_fine(tmp_path):
+    d = good(); d["offset_ms"] = -1000
+    assert ct.check_file(_write(tmp_path, d), 4, 13000) == []
+
+
+def test_shipped_exception_is_078_with_a_real_reason():
+    assert set(ct.FIRST_AYAH_BEFORE_TRACK) == {78}
+    r = ct.FIRST_AYAH_BEFORE_TRACK[78]
+    assert "3.1 s" in r and "-3092" in r and "s078_a01_at_132ms_first.wav" in r
+
+
+def test_dir_unlisted_violation_fails_and_listed_passes(tmp_path, monkeypatch):
+    tdir, quran, titles, ex = _mini_world(tmp_path, monkeypatch)
+    _write(tdir, negative_first())
+    s = json.loads((tdir / "_summary.json").read_text())
+    s["surahs"]["112"]["offset_ms"] = -1500
+    s["surahs"]["112"]["first_ayah_spotify_ms"] = -500
+    (tdir / "_summary.json").write_text(json.dumps(s))
+    assert any("before the Spotify track starts" in e for e in ct.check(tdir, quran, titles, ex))
+    reason = "track starts inside the reference"
+    s["unresolved"] = [{"surah": 112, "issue": reason}]
+    (tdir / "_summary.json").write_text(json.dumps(s))
+    assert ct.check(tdir, quran, titles, ex, first_before_track={112: reason}) == []
+
+
+def test_dir_exception_for_unshipped_surah_fails(tmp_path, monkeypatch):
+    tdir, quran, titles, ex = _mini_world(tmp_path, monkeypatch)
+    errs = ct.check(tdir, quran, titles, ex, first_before_track={113: "r"})
+    assert any("113" in e and "exception" in e for e in errs)
+
+
+def test_dir_summary_first_ayah_and_unresolved_consistency(tmp_path, monkeypatch):
+    tdir, quran, titles, ex = _mini_world(tmp_path, monkeypatch)
+    s = json.loads((tdir / "_summary.json").read_text())
+    s["surahs"]["112"]["first_ayah_spotify_ms"] = 1067
+    (tdir / "_summary.json").write_text(json.dumps(s))
+    assert any("first_ayah_spotify_ms" in e for e in ct.check(tdir, quran, titles, ex))
+    s["surahs"]["112"]["first_ayah_spotify_ms"] = 1066
+    s["unresolved"] = [{"surah": 112, "issue": "x"}]       # not an exception -> inconsistent
+    (tdir / "_summary.json").write_text(json.dumps(s))
+    assert any("unresolved" in e for e in ct.check(tdir, quran, titles, ex))

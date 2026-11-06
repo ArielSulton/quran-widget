@@ -7,16 +7,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import spotcheck  # noqa: E402
 
 
-def test_worst_flagged_orders_fallback_first_then_delta():
+def test_worst_flagged_is_first_fallbacks_by_ayah_plus_onsets_by_delta():
     flags = [
         {"ayah": 2, "kind": "onset", "delta_ms": -900},
-        {"ayah": 3, "kind": "ctc_fallback", "delta_ms": 0},
+        {"ayah": 9, "kind": "ctc_fallback", "delta_ms": 0},
         {"ayah": 4, "kind": "onset", "delta_ms": 1200},
-        {"ayah": 5, "kind": "ctc_fallback", "delta_ms": 40},
+        {"ayah": 5, "kind": "ctc_fallback", "delta_ms": 0},
         {"ayah": 6, "kind": "onset", "delta_ms": 400},
+        {"ayah": 3, "kind": "ctc_fallback", "delta_ms": 0},
+        {"ayah": 7, "kind": "ctc_fallback", "delta_ms": 0},
+        {"ayah": 8, "kind": "onset", "delta_ms": 350},
     ]
-    got = [f["ayah"] for f in spotcheck.worst_flagged(flags, 3)]
-    assert got == [5, 3, 4]
+    got = [(f["kind"], f["ayah"]) for f in spotcheck.worst_flagged(flags, 3)]
+    # 3 lowest-numbered fallbacks (3, 5, 7), then the 3 biggest measured onset moves (4, 2, 6):
+    # onset-delta boundaries are NOT crowded out by fallbacks.
+    assert got == [("ctc_fallback", 3), ("ctc_fallback", 5), ("ctc_fallback", 7),
+                   ("onset", 4), ("onset", 2), ("onset", 6)]
     assert spotcheck.worst_flagged([], 3) == []
 
 
@@ -42,12 +48,13 @@ FLAGS = [{"ayah": 3, "kind": "onset", "delta_ms": 350}, {"ayah": 5, "kind": "ctc
          {"ayah": 2, "kind": "ctc_fallback", "delta_ms": 0}, {"ayah": 4, "kind": "onset", "delta_ms": -900}]
 
 
-def test_plan_clips_worst_three_flagged_plus_first_and_last():
+def test_plan_clips_flagged_plus_first_and_last():
     plan = spotcheck.plan_clips(FLAGS, STARTS, count=3)
-    assert [(c["ayah"], c["start_ms"]) for c in plan] == [(1, 1500), (2, 5000), (4, 14000), (5, 20000)]
+    assert [(c["ayah"], c["start_ms"]) for c in plan] == [(1, 1500), (2, 5000), (3, 9000), (4, 14000), (5, 20000)]
     by = {c["ayah"]: c["reasons"] for c in plan}
     assert by[1] == ["first ayah"]
     assert by[2] == ["ctc_fallback"]
+    assert by[3] == ["onset delta +350 ms"]
     assert by[4] == ["onset delta -900 ms"]
     assert by[5] == ["ctc_fallback", "last ayah"]          # flagged AND last: one clip, both reasons
 
@@ -91,3 +98,36 @@ def test_play_all_script_plays_in_order_with_labels_and_is_safe_to_quote():
 def test_format_ref_time():
     assert spotcheck.fmt_time(0) == "00:00.000"
     assert spotcheck.fmt_time(83123) == "01:23.123"
+
+
+# ---- "Prioritas dengar" section --------------------------------------------------------------
+def test_priority_section_is_at_the_top_with_order_and_tiers():
+    prio = [{"surah": 78, "name": "An-Naba'", "ayah": 1, "start_ms": 132, "file": "78/a.wav",
+             "note": "Track Spotify mulai di dalam rekaman referensi."},
+            {"surah": 97, "name": "Al-Qadr", "ayah": 4, "start_ms": 18160, "file": "97/b.wav",
+             "note": "Ayat 4 berdurasi 25 detik."}]
+    md = spotcheck.render_index(ENTRIES, prio)
+    assert md.index("## Prioritas dengar") < md.index("## Surah 112")
+    assert md.index("78/a.wav") < md.index("97/b.wav") < md.index("## Surah 112")
+    assert "Track Spotify mulai di dalam rekaman referensi." in md
+    # plain statement of how the clips were chosen
+    assert "tiga batas ctc_fallback pertama (nomor ayat terkecil)" in md
+    assert "bukan yang terburuk" in md.lower()
+    assert "ayat pertama dan terakhir" in md
+
+
+def test_priority_notes_from_summary_unresolved_and_extra():
+    summary = {"unresolved": [{"surah": 78, "issue": "Spotify starts 3.1 s into the reference"}],
+               "surahs": {"078": {"offset_ms": -3092, "first_ayah_spotify_ms": -2960}}}
+    entries = [{"surah": 78, "name": "An-Naba'", "clips": [
+                    {"ayah": 1, "start_ms": 132, "reasons": ["first ayah"], "file": "78/f.wav"},
+                    {"ayah": 40, "start_ms": 230938, "reasons": ["last ayah"], "file": "78/l.wav"}]},
+               {"surah": 97, "name": "Al-Qadr", "clips": [
+                    {"ayah": 1, "start_ms": 48, "reasons": ["first ayah"], "file": "97/f.wav"},
+                    {"ayah": 5, "start_ms": 43282, "reasons": ["last ayah"], "file": "97/l.wav"}]}]
+    starts = {97: [48, 7528, 13168, 18160, 43282]}
+    prio = spotcheck.priority_clips(summary, entries, starts)
+    assert [(p["surah"], p["ayah"], p["file"]) for p in prio] == [(78, 1, "78/f.wav"), (97, 5, "97/l.wav")]
+    assert "-2960 ms" in prio[0]["note"] and "ayat 1" in prio[0]["note"]
+    assert "Spotify starts 3.1 s into the reference" in prio[0]["note"]
+    assert "ayat 4" in prio[1]["note"] and "25,1 detik" in prio[1]["note"]     # 43282-18160

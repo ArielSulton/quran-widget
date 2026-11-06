@@ -2,6 +2,12 @@
  "notes": {
   "crosscheck": "Whisper cross-check intentionally skipped (user decision); boundaries are verified by listening to the clips from tools/spotcheck.py --flagged"
  },
+ "unresolved": [
+  {
+   "surah": 78,
+   "issue": "The Spotify track begins about 3.1 s into the reference recording (offset -3092 ms, five tight probes), so ayah 1 (reference 132 ms) is already in progress at Spotify position 0. UNRESOLVED: confirm by listening to build/spotcheck_flagged/78/s078_a01_at_132ms_first.wav and to the start of the Spotify track."
+  }
+ ],
  "class_modes": {
   "long": 4206,
   "short": 75
@@ -21,6 +27,7 @@
  "surahs": {
   "078": {
    "offset_ms": -3092,
+   "first_ayah_spotify_ms": -2960,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -156,6 +163,7 @@
   },
   "079": {
    "offset_ms": 4206,
+   "first_ayah_spotify_ms": 4284,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -273,6 +281,7 @@
   },
   "080": {
    "offset_ms": 4322,
+   "first_ayah_spotify_ms": 4374,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -402,6 +411,7 @@
   },
   "081": {
    "offset_ms": 4312,
+   "first_ayah_spotify_ms": 4364,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -469,6 +479,7 @@
   },
   "082": {
    "offset_ms": 4201,
+   "first_ayah_spotify_ms": 4253,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -562,6 +573,7 @@
   },
   "083": {
    "offset_ms": 971,
+   "first_ayah_spotify_ms": 1023,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -631,6 +643,7 @@
   },
   "084": {
    "offset_ms": 4205,
+   "first_ayah_spotify_ms": 4267,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -698,6 +711,7 @@
   },
   "085": {
    "offset_ms": 4238,
+   "first_ayah_spotify_ms": 4310,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -785,6 +799,7 @@
   },
   "086": {
    "offset_ms": 3378,
+   "first_ayah_spotify_ms": 3430,
    "confidence": "medium",
    "class": "long",
    "clusters": [
@@ -838,6 +853,7 @@
   },
   "087": {
    "offset_ms": 4216,
+   "first_ayah_spotify_ms": 4274,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -891,6 +907,7 @@
   },
   "088": {
    "offset_ms": 4286,
+   "first_ayah_spotify_ms": 4348,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -946,6 +963,7 @@
   },
   "089": {
    "offset_ms": 4224,
+   "first_ayah_spotify_ms": 4276,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -1081,6 +1099,7 @@
   },
   "090": {
    "offset_ms": 4161,
+   "first_ayah_spotify_ms": 4219,
    "confidence": "low",
    "class": "long",
    "clusters": [
@@ -1136,6 +1155,7 @@
   },
   "091": {
    "offset_ms": 4210,
+   "first_ayah_spotify_ms": 4268,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -1171,6 +1191,7 @@
   },
   "092": {
    "offset_ms": 4183,
+   "first_ayah_spotify_ms": 4241,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -1262,6 +1283,7 @@
   },
   "093": {
    "offset_ms": 3254,
+   "first_ayah_spotify_ms": 3326,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -1290,6 +1312,7 @@
   },
   "094": {
    "offset_ms": 4147,
+   "first_ayah_spotify_ms": 4225,
    "confidence": "high",
    "class": "short",
    "clusters": [
@@ -1318,6 +1341,7 @@
   },
   "095": {
    "offset_ms": 4172,
+   "first_ayah_spotify_ms": 4234,
    "confidence": "medium",
    "class": "short",
    "clusters": [
@@ -1365,6 +1389,7 @@
   },
   "096": {
    "offset_ms": 4225,
+   "first_ayah_spotify_ms": 4297,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -1406,6 +1431,7 @@
   },
   "097": {
    "offset_ms": 4268,
+   "first_ayah_spotify_ms": 4316,
    "confidence": "medium",
    "class": "long",
    "clusters": [
@@ -1447,6 +1473,7 @@
   },
   "098": {
    "offset_ms": 4211,
+   "first_ayah_spotify_ms": 4263,
    "confidence": "low",
    "class": "long",
    "clusters": [
@@ -1490,6 +1517,7 @@
   },
   "099": {
    "offset_ms": 4139,
+   "first_ayah_spotify_ms": 4197,
    "confidence": "medium",
    "class": "long",
    "clusters": [
@@ -1535,6 +1563,7 @@
   },
   "100": {
    "offset_ms": 3314,
+   "first_ayah_spotify_ms": 3382,
    "confidence": "high",
    "class": "long",
    "clusters": [
@@ -1576,6 +1605,7 @@
   },
   "102": {
    "offset_ms": 84,
+   "first_ayah_spotify_ms": 142,
    "confidence": "medium",
    "class": "short",
    "clusters": [
@@ -1610,6 +1640,7 @@
   },
   "103": {
    "offset_ms": 637,
+   "first_ayah_spotify_ms": 699,
    "confidence": "low",
    "class": "short",
    "clusters": [
@@ -1649,6 +1680,7 @@
   },
   "105": {
    "offset_ms": 36,
+   "first_ayah_spotify_ms": 94,
    "confidence": "medium",
    "class": "short",
    "clusters": [
@@ -1683,6 +1715,7 @@
   },
   "106": {
    "offset_ms": 26,
+   "first_ayah_spotify_ms": 78,
    "confidence": "low",
    "class": "short",
    "clusters": [
@@ -1715,6 +1748,7 @@
   },
   "107": {
    "offset_ms": 922,
+   "first_ayah_spotify_ms": 974,
    "confidence": "medium",
    "class": "short",
    "clusters": [
@@ -1762,6 +1796,7 @@
   },
   "108": {
    "offset_ms": 76,
+   "first_ayah_spotify_ms": 148,
    "confidence": "low",
    "class": "short",
    "clusters": [
@@ -1801,6 +1836,7 @@
   },
   "109": {
    "offset_ms": 31,
+   "first_ayah_spotify_ms": 89,
    "confidence": "medium",
    "class": "short",
    "clusters": [
@@ -1842,6 +1878,7 @@
   },
   "110": {
    "offset_ms": 26,
+   "first_ayah_spotify_ms": 84,
    "confidence": "low",
    "class": "short",
    "clusters": [
@@ -1874,6 +1911,7 @@
   },
   "111": {
    "offset_ms": 108,
+   "first_ayah_spotify_ms": 160,
    "confidence": "low",
    "class": "short",
    "clusters": [
@@ -1913,6 +1951,7 @@
   },
   "112": {
    "offset_ms": 66,
+   "first_ayah_spotify_ms": 134,
    "confidence": "medium",
    "class": "short",
    "clusters": [
@@ -1939,6 +1978,7 @@
   },
   "113": {
    "offset_ms": 76,
+   "first_ayah_spotify_ms": 124,
    "confidence": "low",
    "class": "short",
    "clusters": [
@@ -1971,6 +2011,7 @@
   },
   "114": {
    "offset_ms": 60,
+   "first_ayah_spotify_ms": 132,
    "confidence": "medium",
    "class": "short",
    "clusters": [

@@ -17,7 +17,10 @@ data/timing/_summary.json (confidence, clusters, probe offsets, flagged boundari
 track/ref durations, class modes, excluded surahs and reasons).
 
 The slow part (alignment) is cached in build/timing_cache/NNN.json (git-ignored,
-keyed on the mp3 size and the ayat text); --refresh recomputes it.  --shard K/N computes only
+keyed on the mp3 size, the ayat text and ``ALIGN_CACHE_VERSION``); --refresh recomputes it.
+NOTE: even a run that is 100% cache hits calls ``align.ensure_mp3`` for every surah (also the
+excluded ones, for their reference duration), so a default run may DOWNLOAD missing reference
+mp3s into the per-user cache and needs them present otherwise.  --shard K/N computes only
 every N-th surah (to run several processes side by side) and writes no output.
 """
 from __future__ import annotations
@@ -37,6 +40,9 @@ TIMING_DIR = check_timing.TIMING_DIR
 OFFSETS_DIR = ROOT / "build" / "offsets"
 CACHE_DIR = ROOT / "build" / "timing_cache"
 LONG_TRACK_S = 45.0       # Spotify track >= 45 s is class "long"
+# Bump when the logic or thresholds of tools/align.py change (MMS_FA alignment, onset snapping,
+# flag rules): cache entries made by an older aligner are then recomputed instead of reused.
+ALIGN_CACHE_VERSION = 1
 CLUSTER_GAP_MS = 125      # single-linkage gap for offset clustering
 HIGH_MIN_SIZE = 3
 HIGH_MAX_SPREAD_MS = 150
@@ -147,7 +153,7 @@ def load_inputs() -> dict:
 # Slow part: alignment, cached
 # ---------------------------------------------------------------------------------
 def _cache_key(mp3: str, ayat: list[str]) -> dict:
-    return {"mp3_size": os.path.getsize(mp3),
+    return {"align_version": ALIGN_CACHE_VERSION, "mp3_size": os.path.getsize(mp3),
             "ayat_sha256": hashlib.sha256("\n".join(ayat).encode("utf-8")).hexdigest()}
 
 
@@ -193,7 +199,8 @@ def assemble(inp: dict, cache: dict[int, dict]) -> tuple[dict[int, dict], dict]:
                       "ayah_starts_ms": starts}
         d_s = round(sp_ms / 1000 - c["ref_s"], 3)
         per[f"{n:03d}"] = {
-            "offset_ms": ch["offset_ms"], "confidence": ch["confidence"],
+            "offset_ms": ch["offset_ms"], "first_ayah_spotify_ms": starts[0] + ch["offset_ms"],
+            "confidence": ch["confidence"],
             "class": track_class(sp_ms / 1000), "clusters": ch["clusters"],
             "probe_offsets_ms": probes, "ayah_count": len(starts),
             "spotify_duration_ms": sp_ms, "track_s": inp["probes"][n]["track_s"],
@@ -205,7 +212,10 @@ def assemble(inp: dict, cache: dict[int, dict]) -> tuple[dict[int, dict], dict]:
     for n, reason in check_timing.EXCLUDED.items():
         excluded[f"{n:03d}"] = {"reason": reason, "spotify_s": inp["spotify_ms"][n] / 1000,
                                 "ref_s": cache[n]["ref_s"] if n in cache else None}
-    summary = {"notes": {"crosscheck": CROSSCHECK_NOTE}, "class_modes": modes, "excluded": excluded, "surahs": per}
+    unresolved = [{"surah": n, "issue": check_timing.FIRST_AYAH_BEFORE_TRACK[n]}
+                  for n in sorted(check_timing.FIRST_AYAH_BEFORE_TRACK) if n in timings]
+    summary = {"notes": {"crosscheck": CROSSCHECK_NOTE}, "unresolved": unresolved,
+               "class_modes": modes, "excluded": excluded, "surahs": per}
     return timings, summary
 
 

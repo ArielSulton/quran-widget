@@ -12,8 +12,9 @@ are printed so a human can listen and verify that the cut point sits exactly whe
 next ayah begins.
 
 ``--flagged`` instead reads data/timing/_summary.json and exports the +-1 s clips of up to
-``--count`` (default 3) WORST low-confidence boundaries per surah (ctc_fallback first, then by
-|delta_ms|) PLUS the first and last ayah start of every surah, into
+``--count`` (default 3) ctc_fallback boundaries per surah (the lowest ayah numbers; they all have
+delta 0, so these are NOT "the worst") plus up to ``--count`` boundaries with the largest measured
+onset |delta_ms|, PLUS the first and last ayah start of every surah, into
 build/spotcheck_flagged/<surah>/, using the shipped data/timing/NNN.json starts (no
 re-alignment).  A full run also writes build/spotcheck_flagged/INDEX.md (what to listen for,
 per clip) and play_all.sh (plays every clip in order with ffplay, label first).  The boundary is at exactly 1.000 s in every clip; for a boundary
@@ -50,8 +51,16 @@ def export_clip(mp3: str, boundary_ms: int, out: Path, margin_ms: int = 1000) ->
 
 
 def worst_flagged(flags: list[dict], count: int = 3) -> list[dict]:
-    """The ``count`` worst flagged boundaries: ctc_fallback first, then largest |delta_ms|."""
-    return sorted(flags, key=lambda f: (f["kind"] != "ctc_fallback", -abs(f["delta_ms"]), f["ayah"]))[:count]
+    """The flagged boundaries to export for one surah (two separate quotas of ``count`` each):
+
+    * the first ``count`` ``ctc_fallback`` boundaries by LOWEST ayah number (they all have
+      delta 0, so there is no "worst" among them), then
+    * the ``count`` ``onset`` boundaries with the largest measured |delta_ms|.
+    Onset boundaries are therefore never crowded out by fallbacks."""
+    fallbacks = sorted((f for f in flags if f["kind"] == "ctc_fallback"), key=lambda f: f["ayah"])
+    onsets = sorted((f for f in flags if f["kind"] != "ctc_fallback"),
+                    key=lambda f: (-abs(f["delta_ms"]), f["ayah"]))
+    return fallbacks[:count] + onsets[:count]
 
 
 def _flag_reason(f: dict) -> str:
@@ -78,12 +87,59 @@ def _label(surah: int, name: str, c: dict) -> str:
             f"({', '.join(c['reasons'])}) - batas di detik 1.0 klip")
 
 
-def render_index(entries: list[dict]) -> str:
+PRIORITY_LAST_AYAH = (97,)   # surahs whose LAST-ayah clip is listened to first (very long previous ayah)
+
+
+def priority_clips(summary: dict, entries: list[dict], starts: dict[int, list[int]]) -> list[dict]:
+    """Clips to listen to first: the first-ayah clip of every ``unresolved`` surah (first ayah
+    before the Spotify track starts), then the last-ayah clip of ``PRIORITY_LAST_AYAH`` surahs."""
+    by_surah = {e["surah"]: e for e in entries}
+    out = []
+    for u in summary.get("unresolved", []):
+        e = by_surah.get(u["surah"])
+        if e is None:
+            continue
+        info = summary["surahs"][f"{u['surah']:03d}"]
+        clip = next(c for c in e["clips"] if c["ayah"] == 1)
+        note = (f"Track Spotify tampaknya mulai sekitar {-info['offset_ms'] / 1000:.1f} detik di dalam rekaman "
+                f"referensi (offset {info['offset_ms']} ms), jadi ayat 1 sudah berjalan di posisi Spotify 0 "
+                f"(ayat 1 mulai di {info['first_ayah_spotify_ms']} ms Spotify). Dengarkan klip ini dan awal "
+                f"track Spotify. Isu: {u['issue']}")
+        out.append({"surah": e["surah"], "name": e["name"], "ayah": 1, "start_ms": clip["start_ms"],
+                    "file": clip["file"], "note": note})
+    for n in PRIORITY_LAST_AYAH:
+        e = by_surah.get(n)
+        if e is None:
+            continue
+        st = starts[n]
+        clip = next(c for c in e["clips"] if c["ayah"] == len(st))
+        span = f"{(st[-1] - st[-2]) / 1000:.1f}".replace(".", ",")
+        note = (f"Ayat {len(st) - 1} berdurasi {span} detik ({fmt_time(st[-2])} sampai {fmt_time(st[-1])}): "
+                f"masuk akal tetapi panjang. Klip ini = awal ayat {len(st)} (ayat terakhir), yaitu akhir "
+                f"ayat {len(st) - 1} yang panjang itu.")
+        out.append({"surah": e["surah"], "name": e["name"], "ayah": len(st), "start_ms": clip["start_ms"],
+                    "file": clip["file"], "note": note})
+    return out
+
+
+def render_index(entries: list[dict], priority: list[dict] | None = None) -> str:
     out = ["# Klip pemeriksaan batas ayat (rekaman referensi publik)", "",
            "Tiap klip 2 detik: batas ayat berada tepat di detik 1.0 (1 detik sebelum, 1 detik sesudah).",
-           "Dengarkan apakah ayat berikutnya mulai persis di tengah klip.",
-           "`first ayah` / `last ayah` = awal ayat pertama / awal ayat terakhir (selalu diekspor); "
-           "`ctc_fallback` / `onset delta` = batas bertanda ragu dari aligner.", ""]
+           "Dengarkan apakah ayat berikutnya mulai persis di tengah klip.", ""]
+    if priority:
+        out += ["## Prioritas dengar", "", "Dengarkan klip-klip ini lebih dulu, sesuai urutan:", ""]
+        for i, p in enumerate(priority, 1):
+            out += [f"{i}. Surah {p['surah']} {p['name']} - ayat {p['ayah']} mulai @ {fmt_time(p['start_ms'])}: "
+                    f"`{p['file']}`", f"   {p['note']}", ""]
+    out += ["### Cara klip dipilih (3 tingkat)", "",
+            "1. Prioritas dengar (di atas): item yang belum terselesaikan atau tampak janggal.",
+            "2. Batas bertanda dari aligner, per surah: tiga batas ctc_fallback pertama (nomor ayat "
+            "terkecil) ditambah tiga batas onset dengan selisih terukur (|delta| > 300 ms) terbesar. "
+            "Ini BUKAN yang terburuk: semua ctc_fallback bernilai delta 0, jadi tidak ada urutan "
+            "\"terburuk\" di antara mereka; batas ctc_fallback lainnya (jika ada) tidak diekspor.",
+            "3. Awal ayat pertama dan terakhir setiap surah (selalu diekspor, walau tidak bertanda), "
+            "sehingga tiap surah punya minimal 2 klip.", "",
+            "Alasan: `first ayah` / `last ayah` = tingkat 3; `ctc_fallback` / `onset delta` = tingkat 2.", ""]
     for e in entries:
         out += [f"## Surah {e['surah']} - {e['name']}", "",
                 "| Ayat | Waktu di rekaman referensi | Alasan | Berkas |", "|---|---|---|---|"]
@@ -112,7 +168,7 @@ def export_flagged(only_surah: int | None, count: int) -> int:
     summary = json.loads((ROOT / "data" / "timing" / "_summary.json").read_text(encoding="utf-8"))
     names = json.loads((ROOT / "data" / "quran" / "juz30.json").read_text(encoding="utf-8"))
     root_out = ROOT / "build" / "spotcheck_flagged"
-    entries, total = [], 0
+    entries, total, all_starts = [], 0, {}
     for key, e in sorted(summary["surahs"].items()):
         n = int(key)
         if only_surah is not None and n != only_surah:
@@ -133,8 +189,10 @@ def export_flagged(only_surah: int | None, count: int) -> int:
             print(f"surah {n}: ayah {c['ayah']} start {c['start_ms']} ms ({', '.join(c['reasons'])}); "
                   f"in clip at {off:.3f} s -> {out.relative_to(ROOT)}")
         entries.append({"surah": n, "name": names[str(n)]["name"], "clips": plan})
+        all_starts[n] = starts
     if only_surah is None:  # index/script cover the whole juz only on a full run
-        (root_out / "INDEX.md").write_text(render_index(entries), encoding="utf-8")
+        (root_out / "INDEX.md").write_text(
+            render_index(entries, priority_clips(summary, entries, all_starts)), encoding="utf-8")
         sh = root_out / "play_all.sh"
         sh.write_text(render_play_all(entries), encoding="utf-8")
         sh.chmod(0o755)

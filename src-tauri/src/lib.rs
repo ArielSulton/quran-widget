@@ -56,7 +56,37 @@ fn stop_loop(app: &tauri::AppHandle) {
     }
 }
 
+/// Variabel lingkungan yang perlu disetel di Linux sebelum WebKitGTK dimulai (kosong bila sudah
+/// disetel pengguna; pilihan pengguna dihormati, mis. `WEBKIT_DISABLE_COMPOSITING_MODE=0 simak`).
+///
+/// Alasan: di jendela transparan pada WebKitGTK, sisa glif (potongan huruf/kotak) dari ayat
+/// sebelumnya tertinggal di tepi kartu setelah ayat berganti. Gejala ini hilang bila compositing
+/// GPU webview dimatikan; sudah dipastikan pengguna di Linux (X11/GNOME, Intel/Mesa, WebKitGTK
+/// 2.50). Kompromi: animasi webview bisa kurang mulus dan `backdrop-filter` tidak dapat
+/// diandalkan; Linux memang sudah memakai bahan solid/CSS tanpa blur.
+///
+/// `lookup` memetakan nama variabel ke nilainya (bawaan: lingkungan proses), agar bisa diuji.
+pub fn linux_webkit_env(
+    lookup: impl Fn(&str) -> Option<String>,
+) -> Vec<(&'static str, &'static str)> {
+    const NAME: &str = "WEBKIT_DISABLE_COMPOSITING_MODE";
+    if lookup(NAME).is_some() {
+        Vec::new()
+    } else {
+        vec![(NAME, "1")]
+    }
+}
+
 pub fn run() {
+    // Harus sebelum inisialisasi GTK/WebKit dan sebelum thread mana pun dibuat (set_var tidak
+    // aman terhadap pembacaan lingkungan dari thread lain).
+    #[cfg(target_os = "linux")]
+    for (name, value) in
+        linux_webkit_env(|key| std::env::var_os(key).map(|v| v.to_string_lossy().into_owned()))
+    {
+        std::env::set_var(name, value);
+    }
+
     let stop = Arc::new(AtomicBool::new(false));
     let shift = Arc::new(AtomicI64::new(0));
     let loop_shift = shift.clone();
@@ -102,4 +132,33 @@ pub fn run() {
             stop_loop(handle);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::linux_webkit_env;
+
+    #[test]
+    fn sets_compositing_off_when_unset() {
+        let pairs = linux_webkit_env(|_| None);
+        assert_eq!(pairs, vec![("WEBKIT_DISABLE_COMPOSITING_MODE", "1")]);
+    }
+
+    #[test]
+    fn respects_the_users_choice_when_already_set() {
+        // Nilai apa pun (termasuk "0" untuk memilih keluar) dihormati.
+        assert!(linux_webkit_env(|_| Some("0".into())).is_empty());
+        assert!(linux_webkit_env(|_| Some("1".into())).is_empty());
+        assert!(linux_webkit_env(|_| Some(String::new())).is_empty());
+    }
+
+    #[test]
+    fn only_looks_at_its_own_variable() {
+        let asked = std::cell::RefCell::new(Vec::new());
+        let _ = linux_webkit_env(|k| {
+            asked.borrow_mut().push(k.to_string());
+            None
+        });
+        assert_eq!(*asked.borrow(), vec!["WEBKIT_DISABLE_COMPOSITING_MODE"]);
+    }
 }

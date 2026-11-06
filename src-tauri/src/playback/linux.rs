@@ -39,6 +39,24 @@ fn select_spotify<P, E>(
         .find(|p| bus_name(p).to_ascii_lowercase().starts_with(PLAYER_PREFIX))
 }
 
+/// Menyusun [`Snapshot`] dari hasil pembacaan MPRIS. Posisi atau status yang gagal dibaca
+/// TIDAK dikarang (0 / "Stopped"): itu membuat jam ter-anchor ulang ke 0 dan UI berkedip
+/// Intro/jeda. Sebaliknya galatnya diteruskan sebagai `Unavailable`; runtime memperlakukannya
+/// seperti "tidak ada snapshot" untuk satu putaran. `length_us == None` tetap `duration_ms == 0`
+/// (panjang track tidak diketahui).
+fn read_snapshot<EP: std::fmt::Display, ES: std::fmt::Display>(
+    title: &str,
+    length_us: Option<u64>,
+    position_us: Result<u64, EP>,
+    status: Result<&str, ES>,
+) -> Result<Snapshot, SourceError> {
+    let position_us = position_us
+        .map_err(|e| SourceError::Unavailable(format!("gagal membaca posisi: {e}")))?;
+    let status = status
+        .map_err(|e| SourceError::Unavailable(format!("gagal membaca status pemutaran: {e}")))?;
+    Ok(snapshot_from_mpris(title, length_us.unwrap_or(0), position_us, status))
+}
+
 fn status_str(status: PlaybackStatus) -> &'static str {
     match status {
         PlaybackStatus::Playing => "Playing",
@@ -70,7 +88,8 @@ impl PlaybackSource for LinuxSource {
     ///
     /// Jika Spotify melaporkan judul tetapi tidak ada panjang track (`mpris:length`),
     /// `Snapshot` tetap dikembalikan dengan `duration_ms == 0`; nilai 0 berarti durasi
-    /// tidak diketahui. `position_ms` juga 0 bila posisi tidak terbaca.
+    /// tidak diketahui. Posisi atau status yang gagal dibaca menghasilkan `Err(Unavailable)`
+    /// (bukan nilai karangan; lihat `read_snapshot`).
     fn poll(&mut self) -> Result<Option<Snapshot>, SourceError> {
         let mut finder = PlayerFinder::new()
             .map_err(|e| SourceError::Unavailable(format!("gagal terhubung ke D-Bus: {e}")))?;
@@ -89,14 +108,13 @@ impl PlaybackSource for LinuxSource {
         let Some(title) = metadata.title().filter(|t| !t.is_empty()) else {
             return Ok(None);
         };
-        let length_us = metadata.length_in_microseconds().unwrap_or(0);
-        let position_us = player.get_position_in_microseconds().unwrap_or(0);
-        let status = player
-            .get_playback_status()
-            .map(status_str)
-            .unwrap_or("Stopped");
-
-        Ok(Some(snapshot_from_mpris(title, length_us, position_us, status)))
+        read_snapshot(
+            title,
+            metadata.length_in_microseconds(),
+            player.get_position_in_microseconds(),
+            player.get_playback_status().map(status_str),
+        )
+        .map(Some)
     }
 }
 
@@ -131,6 +149,37 @@ mod tests {
         let items: Vec<Result<&str, ()>> = vec![Err(()), Ok("mpv")];
         assert_eq!(select_spotify(items, |n| n), None);
         assert_eq!(select_spotify(Vec::<Result<&str, ()>>::new(), |n| n), None);
+    }
+
+    #[test]
+    fn read_snapshot_passes_values_through_when_reads_succeed() {
+        let s = read_snapshot::<&str, &str>("x", Some(2_000_000), Ok(1_500_000), Ok("Playing"))
+            .expect("ok");
+        assert_eq!((s.duration_ms, s.position_ms, s.is_playing), (2_000, 1_500, true));
+    }
+
+    #[test]
+    fn read_snapshot_keeps_zero_duration_for_unknown_length() {
+        let s = read_snapshot::<&str, &str>("x", None, Ok(1_000), Ok("Paused")).expect("ok");
+        assert_eq!((s.duration_ms, s.position_ms, s.is_playing), (0, 1, false));
+    }
+
+    #[test]
+    fn read_snapshot_propagates_a_failed_position_read() {
+        let r = read_snapshot("x", Some(1), Err("timeout"), Ok::<_, &str>("Playing"));
+        match r {
+            Err(SourceError::Unavailable(m)) => assert!(m.contains("posisi") && m.contains("timeout")),
+            other => panic!("diharapkan Err, dapat {other:?}"),
+        }
+    }
+
+    #[test]
+    fn read_snapshot_propagates_a_failed_status_read() {
+        let r = read_snapshot("x", Some(1), Ok::<_, &str>(5), Err("timeout"));
+        match r {
+            Err(SourceError::Unavailable(m)) => assert!(m.contains("status") && m.contains("timeout")),
+            other => panic!("diharapkan Err, dapat {other:?}"),
+        }
     }
 
     #[test]

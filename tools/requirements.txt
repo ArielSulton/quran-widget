@@ -1,0 +1,10 @@
+# Alignment tools (tools/align.py, tools/spotcheck.py, tools/test_align.py).
+# Install into the repo-local virtualenv only:
+#   python3 -m venv .venv
+#   .venv/bin/pip install --extra-index-url https://download.pytorch.org/whl/cpu -r tools/requirements.txt
+# Also required on PATH: ffmpeg / ffprobe.
+# The MMS_FA model (~1.2 GB) is downloaded on first run to .venv/torch_cache (git-ignored).
+torch==2.14.1+cpu
+torchaudio==2.11.1+cpu
+numpy==2.2.6
+pytest==9.2.0

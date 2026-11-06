@@ -1,0 +1,64 @@
+:root {
+  /* Arab: font stack fallback saja (font belum dibundel). */
+  --font-arabic: "Amiri Quran", "Scheherazade New", "Noto Naskh Arabic", serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Mockup C "Fokus besar": gradien gelap, Arab besar di tengah, terjemah di bawah, footer kecil. */
+#widget {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 22px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(160deg, #0b1d2e, #16384f);
+  font-family: var(--font-ui);
+  user-select: none;
+  cursor: grab;
+}
+
+#arabic {
+  font-family: var(--font-arabic);
+  font-size: 34px;
+  line-height: 2.1;
+}
+
+#arabic:empty {
+  display: none;
+}
+
+#translation {
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.85;
+  margin-top: 14px;
+}
+
+#arabic:empty + #translation {
+  margin-top: 0;
+}
+
+#footer {
+  font-size: 11px;
+  opacity: 0.5;
+  margin-top: 16px;
+}
+
+#footer:empty {
+  display: none;
+}

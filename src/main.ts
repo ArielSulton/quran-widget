@@ -1,6 +1,7 @@
 import "./style.css";
 import juz30 from "../data/quran/juz30.json";
 import { initControls } from "./controls";
+import { layoutCandidates, pickLayout, type Layout } from "./density";
 import { arabicFontPx } from "./fit";
 import { detectMaterial, isMacPlatform } from "./material";
 import { parsePreview } from "./preview";
@@ -36,26 +37,48 @@ let fadeTimer = 0;
 
 let shownVm: ReturnType<typeof viewModel> | null = null;
 
-/** Ayat panjang memakai tata letak rapat (lihat style.css); bila tata letak biasa masih melebihi
- *  kartu (metrik Amiri Quran lebih tinggi dari font cadangan), pakai yang rapat juga. */
-function applyDensity(vm: ReturnType<typeof viewModel>): void {
-  contentEl.dataset.density = vm.arabic.length > 100 || vm.translation.length > 150 ? "compact" : "regular";
-  if (contentEl.getBoundingClientRect().height > widgetEl.clientHeight) contentEl.dataset.density = "compact";
+function setLayout(layout: Layout): void {
+  // Tulis hanya bila berubah (idempoten; tidak memicu kerja yang tak perlu).
+  if (contentEl.dataset.density !== layout.density) contentEl.dataset.density = layout.density;
+  const scale = String(layout.scale);
+  if (contentEl.style.getPropertyValue("--arabic-scale") !== scale) {
+    contentEl.style.setProperty("--arabic-scale", scale);
+  }
+}
+
+/**
+ * Pilih tata letak yang muat di kartu: biasa -> rapat -> font Arab mengecil bertahap (lantai 0,7).
+ * Dipanggil saat teks berganti, saat font selesai dimuat, dan saat ukuran jendela berubah.
+ */
+function applyLayout(vm: ReturnType<typeof viewModel>): void {
+  const preferCompact = vm.arabic.length > 100 || vm.translation.length > 150;
+  const chosen = pickLayout(layoutCandidates(preferCompact), (candidate) => {
+    setLayout(candidate);
+    return contentEl.getBoundingClientRect().height > widgetEl.clientHeight;
+  });
+  setLayout(chosen);
+  // Bila bahkan lantai masih melebihi kartu, sembunyikan footer agar tidak menimpa teks.
+  const tight = contentEl.getBoundingClientRect().height > widgetEl.clientHeight;
+  if (widgetEl.hasAttribute("data-tight") !== tight) widgetEl.toggleAttribute("data-tight", tight);
 }
 
 function paintText(vm: ReturnType<typeof viewModel>): void {
   shownVm = vm;
   arabicEl.textContent = vm.arabic;
-  arabicEl.style.fontSize = `${arabicFontPx(vm.arabic)}px`;
+  arabicEl.style.setProperty("--arabic-px", `${arabicFontPx(vm.arabic)}px`);
   translationEl.textContent = vm.translation;
-  applyDensity(vm);
+  applyLayout(vm);
   footerEl.textContent = vm.footer;
 }
 
-// Font Arab yang baru selesai dimuat mengubah tinggi teks: hitung ulang kepadatan.
+// Font Arab yang baru selesai dimuat dan perubahan ukuran jendela mengubah muat-tidaknya teks.
+// Pengamat hanya melihat kotak kartu (ditentukan jendela), bukan isi, jadi tidak ada umpan balik.
 document.fonts?.addEventListener("loadingdone", () => {
-  if (shownVm) applyDensity(shownVm);
+  if (shownVm) applyLayout(shownVm);
 });
+new ResizeObserver(() => {
+  if (shownVm) applyLayout(shownVm);
+}).observe(widgetEl);
 
 export function render(state: WidgetState): void {
   const vm = viewModel(state, quran);

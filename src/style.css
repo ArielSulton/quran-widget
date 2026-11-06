@@ -105,7 +105,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Isi dipusatkan lewat margin auto di #content: bila terlalu tinggi, ia meluap ke bawah
+     (awal ayat tetap terlihat) alih-alih terpotong di kedua sisi. */
+  justify-content: flex-start;
   border-radius: var(--radius);
   background: var(--fill);
   color: var(--label);
@@ -142,6 +144,7 @@ html[data-material="native"] #widget {
 /* ---- Teks ---- */
 
 #content {
+  margin-block: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -157,7 +160,8 @@ html[data-material="native"] #widget {
 
 #arabic {
   font-family: var(--font-arabic);
-  font-size: 34px;
+  /* --arabic-px dari fit.ts (main.ts); --arabic-scale mengecilkan bertahap bila kartu terlalu kecil. */
+  font-size: calc(var(--arabic-px, 34px) * var(--arabic-scale, 1));
   line-height: 2;
   color: var(--label);
 }
@@ -183,7 +187,8 @@ html[data-material="native"] #widget {
 }
 #content[data-density="compact"] #translation {
   margin-top: 12px;
-  font-size: 13px;
+  /* Ikut mengecil (paling banyak sampai 0,85) hanya pada langkah terakhir kartu yang sangat kecil. */
+  font-size: calc(13px * max(0.85, var(--arabic-scale, 1)));
   line-height: 1.42;
 }
 
@@ -241,6 +246,9 @@ html[data-controls] #controls {
   transform: translate(-50%, 0);
 }
 
+#widget[data-tight] #footer {
+  opacity: 0;
+}
 #widget:hover #footer,
 html[data-controls] #footer {
   opacity: 0;

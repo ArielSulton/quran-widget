@@ -17,3 +17,6 @@ av==17.1.0
 onnxruntime==1.23.2
 tokenizers==0.23.3
 huggingface_hub==2.4.0
+# check_font_coverage.py (bundled Amiri Quran covers every rendered code point); brotli reads .woff2.
+fonttools==4.60.1
+brotli==1.2.1

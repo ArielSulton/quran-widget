@@ -1,3 +1,13 @@
+/* Amiri Quran (SIL OFL 1.1) dibundel tanpa diubah: font sistem tidak punya tanda Qur'an (U+0670, U+06E5, dll.).
+   Lihat src/assets/fonts/README.md dan OFL.txt. `block`: jangan melukis dulu dengan font cadangan. */
+@font-face {
+  font-family: "Amiri Quran";
+  src: url("./assets/fonts/AmiriQuran-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
 /*
  * Widget ayat: kartu kaca ala macOS (minimalis). Bahan permukaan dipilih lewat
  * <html data-material="native|css|solid"> dan tema lewat <html data-theme="light|dark">.
@@ -157,7 +167,7 @@ html[data-material="native"] #widget {
 }
 
 #translation {
-  margin-top: 14px;
+  margin-top: 20px;
   font-size: 14.5px;
   line-height: 1.5;
   color: var(--label-2);
@@ -172,7 +182,7 @@ html[data-material="native"] #widget {
   line-height: 1.85;
 }
 #content[data-density="compact"] #translation {
-  margin-top: 8px;
+  margin-top: 12px;
   font-size: 13px;
   line-height: 1.42;
 }

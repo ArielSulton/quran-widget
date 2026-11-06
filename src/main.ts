@@ -21,6 +21,7 @@ function el(id: string): HTMLElement {
   return node;
 }
 
+const widgetEl = el("widget");
 const contentEl = el("content");
 const arabicEl = el("arabic");
 const translationEl = el("translation");
@@ -33,14 +34,28 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let shownKey: string | null = null;
 let fadeTimer = 0;
 
+let shownVm: ReturnType<typeof viewModel> | null = null;
+
+/** Ayat panjang memakai tata letak rapat (lihat style.css); bila tata letak biasa masih melebihi
+ *  kartu (metrik Amiri Quran lebih tinggi dari font cadangan), pakai yang rapat juga. */
+function applyDensity(vm: ReturnType<typeof viewModel>): void {
+  contentEl.dataset.density = vm.arabic.length > 100 || vm.translation.length > 150 ? "compact" : "regular";
+  if (contentEl.getBoundingClientRect().height > widgetEl.clientHeight) contentEl.dataset.density = "compact";
+}
+
 function paintText(vm: ReturnType<typeof viewModel>): void {
+  shownVm = vm;
   arabicEl.textContent = vm.arabic;
   arabicEl.style.fontSize = `${arabicFontPx(vm.arabic)}px`;
   translationEl.textContent = vm.translation;
-  // Ayat panjang memakai tata letak rapat (lihat style.css).
-  contentEl.dataset.density = vm.arabic.length > 100 || vm.translation.length > 150 ? "compact" : "regular";
+  applyDensity(vm);
   footerEl.textContent = vm.footer;
 }
+
+// Font Arab yang baru selesai dimuat mengubah tinggi teks: hitung ulang kepadatan.
+document.fonts?.addEventListener("loadingdone", () => {
+  if (shownVm) applyDensity(shownVm);
+});
 
 export function render(state: WidgetState): void {
   const vm = viewModel(state, quran);

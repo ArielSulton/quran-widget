@@ -1,12 +1,16 @@
 # Rilis: dipicu oleh tag `v*` (mis. `git tag v0.1.0 && git push origin v0.1.0`).
-# Membangun installer untuk macOS (universal), Linux, dan Windows lalu membuat RILIS DRAFT di
-# https://github.com/ArielSulton/quran-widget/releases . Draft tidak terlihat publik; pemilik repositori
-# menerbitkannya secara manual setelah memeriksa lampirannya.
+#
+# Secara bawaan (push tag) HANYA build Linux (ubuntu-22.04) yang dibuat. Itulah satu-satunya build
+# yang sumber pemutarannya sudah diverifikasi di mesin asli. Sumber pemutaran macOS (osascript) dan
+# Windows (SMTC) sudah diimplementasikan tetapi BELUM diverifikasi di mesin asli (baru terbukti
+# kompilasi dan tes murni di CI), jadi installer macOS/Windows bersifat eksperimental dan tidak
+# dibuat pada rilis biasa. Untuk membuatnya: Actions > Release > "Run workflow", pilih TAG (bukan
+# cabang) pada "Use workflow from", lalu centang `include_experimental`.
+#
+# Hasilnya adalah RILIS DRAFT di https://github.com/ArielSulton/quran-widget/releases . Draft tidak
+# terlihat publik; pemilik repositori menerbitkannya secara manual setelah memeriksa lampirannya.
 #
 # Belum diverifikasi: workflow ini belum pernah dijalankan.
-#
-# PERINGATAN platform: sumber pemutaran saat ini baru ada untuk Linux (MPRIS). Build macOS/Windows
-# dapat dikompilasi tetapi aplikasinya belum bisa membaca Spotify (lihat README, "Batasan").
 #
 # TANPA penandatanganan kode: tidak ada secret yang dirujuk. Artinya bagi pengguna:
 #   - macOS: Gatekeeper menolak membuka aplikasi tak bertanda/tak ternotarisasi sampai pengguna
@@ -15,32 +19,59 @@
 #   - Linux: tidak terpengaruh.
 # Untuk menandatangani nanti, tambahkan secret repositori dan buka komentar pada bagian `env:` langkah
 # tauri-action di bawah (lihat https://v2.tauri.app/distribute/sign/macos/ dan .../windows/).
+#
+# Kebijakan pin: tauri-action dipin ke SHA commit (aksi yang menyentuh GITHUB_TOKEN dengan hak tulis);
+# aksi lain (actions/*, dtolnay, Swatinem) memakai tag mayor.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      include_experimental:
+        description: "Sertakan build macOS dan Windows (eksperimental, belum diverifikasi di mesin asli)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # membuat rilis dan mengunggah lampiran
 
 jobs:
+  # Menyusun matriks: Linux selalu; macOS (universal) dan Windows hanya bila diminta lewat
+  # workflow_dispatch. `matrix` tidak bisa dipakai di `if:` tingkat job, jadi matriksnya dibuat di sini.
+  plan:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          INCLUDE_EXPERIMENTAL: ${{ inputs.include_experimental }}
+        run: |
+          linux='{"platform":"ubuntu-22.04","args":"","rust-targets":""}'
+          mac='{"platform":"macos-latest","args":"--target universal-apple-darwin","rust-targets":"aarch64-apple-darwin,x86_64-apple-darwin"}'
+          win='{"platform":"windows-latest","args":"","rust-targets":""}'
+          if [ "$INCLUDE_EXPERIMENTAL" = "true" ]; then
+            echo "matrix={\"include\":[$linux,$mac,$win]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"include\":[$linux]}" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            args: --target universal-apple-darwin
-            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
-          - platform: ubuntu-22.04
-            args: ""
-            rust-targets: ""
-          - platform: windows-latest
-            args: ""
-            rust-targets: ""
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.platform }}
     steps:
+      - name: Pastikan dijalankan dari tag
+        if: github.ref_type != 'tag'
+        shell: bash
+        run: |
+          echo "Jalankan workflow ini dari sebuah tag v* (bukan cabang)." >&2
+          exit 1
+
       - uses: actions/checkout@v4
 
       - name: Pastikan tabel waktu ayat ada
@@ -77,7 +108,8 @@ jobs:
 
       - run: npm ci
 
-      - uses: tauri-apps/tauri-action@v0
+      # tauri-action v0.6.2 (dipin ke SHA commit tag tersebut)
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # --- Penandatanganan (BELUM dikonfigurasi; buka komentar setelah secret dibuat) ---
@@ -94,8 +126,8 @@ jobs:
           releaseName: "Simak ${{ github.ref_name }}"
           releaseBody: |
             Simak ${{ github.ref_name }} (pra-rilis).
+            Build Linux adalah yang terverifikasi. Build macOS dan Windows (bila ada di rilis ini) bersifat eksperimental: dukungan pemutarannya sudah diimplementasikan tetapi belum diverifikasi di mesin asli.
             Installer belum ditandatangani: macOS Gatekeeper dan Windows SmartScreen akan menampilkan peringatan.
-            Baru Linux yang dapat membaca Spotify; dukungan macOS dan Windows belum selesai.
             Lihat README untuk batasan lengkap.
           releaseDraft: true
           prerelease: true

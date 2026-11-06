@@ -2409,6 +2409,7 @@ name = "quran-widget"
 version = "0.1.0"
 dependencies = [
  "mpris",
+ "serde",
  "serde_json",
  "tauri",
  "tauri-build",

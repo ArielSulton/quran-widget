@@ -161,7 +161,8 @@ html[data-material="native"] #widget {
 #arabic {
   font-family: var(--font-arabic);
   /* --arabic-px dari fit.ts (main.ts); --arabic-scale mengecilkan bertahap bila kartu terlalu kecil. */
-  font-size: calc(var(--arabic-px, 34px) * var(--arabic-scale, 1));
+  /* --size-scale (density.ts: sizeScale) membesarkan font mengikuti ukuran jendela, 1 sampai 1,6. */
+  font-size: calc(var(--arabic-px, 34px) * var(--arabic-scale, 1) * var(--size-scale, 1));
   line-height: 2;
   color: var(--label);
 }
@@ -171,8 +172,8 @@ html[data-material="native"] #widget {
 }
 
 #translation {
-  margin-top: 20px;
-  font-size: 14.5px;
+  margin-top: calc(20px * var(--tr-scale, 1));
+  font-size: calc(14.5px * var(--tr-scale, 1));
   line-height: 1.5;
   color: var(--label-2);
   text-wrap: balance;
@@ -186,15 +187,15 @@ html[data-material="native"] #widget {
   line-height: 1.85;
 }
 #content[data-density="compact"] #translation {
-  margin-top: 12px;
+  margin-top: calc(12px * var(--tr-scale, 1));
   /* Ikut mengecil (paling banyak sampai 0,85) hanya pada langkah terakhir kartu yang sangat kecil. */
-  font-size: calc(13px * max(0.85, var(--arabic-scale, 1)));
+  font-size: calc(13px * max(0.85, var(--arabic-scale, 1)) * var(--tr-scale, 1));
   line-height: 1.42;
 }
 
 #arabic:empty + #translation {
   margin-top: 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--tr-scale, 1));
 }
 
 #footer {
@@ -203,7 +204,7 @@ html[data-material="native"] #widget {
   left: 0;
   right: 0;
   text-align: center;
-  font-size: 11px;
+  font-size: calc(11px * var(--ft-scale, 1));
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
   color: var(--label-3);
@@ -244,6 +245,49 @@ html[data-controls] #controls {
 #widget:has(:focus-visible) #controls {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+/* ---- Pegangan ubah ukuran (pojok kanan bawah), muncul bersama pil kontrol ---- */
+
+#resize-grip {
+  all: unset;
+  box-sizing: border-box;
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  color: var(--label-2);
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0;
+  transition:
+    opacity 160ms var(--ease),
+    background-color 120ms var(--ease);
+}
+#resize-grip svg {
+  width: 14px;
+  height: 14px;
+}
+#resize-grip:hover {
+  background: var(--hover);
+}
+#resize-grip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+#widget:hover #resize-grip,
+html[data-controls] #resize-grip,
+#widget:has(:focus-visible) #resize-grip {
+  opacity: 1;
+}
+
+/* Saat ukuran tersimpan dipulihkan, sembunyikan kartu agar lompatan ukuran tidak terlihat. */
+html[data-restoring] body {
+  visibility: hidden;
 }
 
 #widget[data-tight] #footer {

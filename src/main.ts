@@ -1,13 +1,14 @@
 import "./style.css";
 import juz30 from "../data/quran/juz30.json";
 import { initControls } from "./controls";
-import { layoutCandidates, pickLayout, type Layout } from "./density";
+import { footerScale, layoutCandidates, pickLayout, sizeScale, translationScale, type Layout } from "./density";
 import { arabicFontPx } from "./fit";
 import { detectMaterial, isMacPlatform } from "./material";
 import { parsePreview } from "./preview";
 import { loadSync, saveSync } from "./sync";
 import { loadTheme, resolveTheme, saveTheme, type KeyValueStore, type ThemePref } from "./theme";
 import { viewModel, type QuranData, type WidgetState } from "./viewModel";
+import { initResizeGrip, initWindowSizePersistence, type WindowApi } from "./windowControls";
 
 const quran = juz30 as unknown as QuranData;
 
@@ -46,11 +47,31 @@ function setLayout(layout: Layout): void {
   }
 }
 
+function setCustomProp(name: string, value: number): void {
+  const text = String(value);
+  if (widgetEl.style.getPropertyValue(name) !== text) widgetEl.style.setProperty(name, text);
+}
+
 /**
- * Pilih tata letak yang muat di kartu: biasa -> rapat -> font Arab mengecil bertahap (lantai 0,7).
+ * Skala font menurut ukuran kartu (1 pada kartu bawaan 480x280, sampai 1,6). Di macOS (bahan
+ * `native`) kartu = seluruh jendela, jadi inset bayangan 20+20 / 16+24 dikurangkan lebih dulu
+ * agar jendela 520x320 tetap berskala 1.
+ */
+function applySizeScale(): void {
+  const native = root.dataset.material === "native";
+  const size = sizeScale(widgetEl.clientWidth - (native ? 40 : 0), widgetEl.clientHeight - (native ? 40 : 0));
+  setCustomProp("--size-scale", size);
+  setCustomProp("--tr-scale", translationScale(size));
+  setCustomProp("--ft-scale", footerScale(size));
+}
+
+/**
+ * Pilih tata letak yang muat di kartu: mulai dari ukuran font hasil skala jendela, lalu biasa ->
+ * rapat -> font Arab mengecil bertahap (lantai 0,7 kali ukuran itu).
  * Dipanggil saat teks berganti, saat font selesai dimuat, dan saat ukuran jendela berubah.
  */
 function applyLayout(vm: ReturnType<typeof viewModel>): void {
+  applySizeScale();
   const preferCompact = vm.arabic.length > 100 || vm.translation.length > 150;
   const chosen = pickLayout(layoutCandidates(preferCompact), (candidate) => {
     setLayout(candidate);
@@ -100,6 +121,10 @@ export function render(state: WidgetState): void {
   }, FADE_OUT_MS);
 }
 
+// Kait pengembangan (hanya mode pratinjau di browser; di Tauri `preview` null): dipakai
+// scripts/layout-sweep.mjs untuk merender ayat satu per satu tanpa memuat ulang halaman.
+if (preview) Object.assign(window, { __simakRender: render });
+
 // ---- Penyimpanan, tema, bahan permukaan ----
 
 /** localStorage bisa melempar (mis. diblokir); jatuh ke penyimpanan memori. */
@@ -121,6 +146,10 @@ let syncMs = preview?.syncMs ?? loadSync(store);
 const tauriApi = isTauri
   ? Promise.all([import("@tauri-apps/api/core"), import("@tauri-apps/api/window")])
   : null;
+const windowApi: Promise<WindowApi> | null = tauriApi ? tauriApi.then(([, win]) => win) : null;
+
+// Pulihkan ukuran jendela tersimpan secepat mungkin (kartu disembunyikan sampai selesai).
+initWindowSizePersistence(windowApi, store);
 
 function applyTheme(): void {
   const resolved = resolveTheme(themePref, systemDark.matches);
@@ -178,6 +207,7 @@ initControls({
   },
 });
 sendSync(syncMs);
+initResizeGrip(windowApi);
 
 // ---- Keadaan ----
 

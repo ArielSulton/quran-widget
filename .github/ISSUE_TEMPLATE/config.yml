@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability / Laporkan kerentanan keamanan
+    url: https://github.com/ArielSulton/quran-widget/security/policy
+    about: Do not open a public issue for security problems. Read the security policy and report privately. / Jangan buka issue publik untuk masalah keamanan. Baca kebijakan keamanan dan laporkan secara privat.

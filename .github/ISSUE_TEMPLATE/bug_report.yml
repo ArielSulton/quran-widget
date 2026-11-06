@@ -1,0 +1,80 @@
+name: Bug report / Laporan bug
+description: Something in Simak does not work as expected. / Ada yang tidak berjalan sesuai harapan.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please read the "Limitations" section of the README first: some behavior (for example a sync error of about 1 second) is already known and can be tuned with "geser sinkron".
+        Terima kasih atas laporannya. Mohon baca bagian "Batasan" di README dulu: sebagian perilaku (misalnya galat sinkron sekitar 1 detik) sudah diketahui dan bisa disetel dengan "geser sinkron".
+        For security problems, do not use this form. See the security policy. / Untuk masalah keamanan, jangan pakai form ini. Lihat kebijakan keamanan.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened? / Apa yang terjadi?
+      description: Describe the problem and what you expected instead. / Jelaskan masalahnya dan apa yang Anda harapkan.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Langkah mereproduksi
+      description: Numbered steps, starting from starting Simak. / Langkah bernomor, mulai dari menjalankan Simak.
+      placeholder: |
+        1. Start Simak
+        2. Play surah ... in the Spotify desktop app
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system / Sistem operasi
+      options:
+        - Linux (X11)
+        - Linux (Wayland)
+        - macOS
+        - Windows
+        - Other / Lainnya
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version and desktop / Versi OS dan desktop
+      description: For example "Ubuntu 24.04, GNOME 46" or "Windows 11 23H2". / Misalnya "Ubuntu 24.04, GNOME 46" atau "Windows 11 23H2".
+    validations:
+      required: true
+  - type: input
+    id: simak-version
+    attributes:
+      label: Simak version or commit / Versi atau commit Simak
+      description: How you run Simak (installer version, or `git rev-parse --short HEAD`). / Cara Anda menjalankan Simak (versi installer, atau `git rev-parse --short HEAD`).
+    validations:
+      required: true
+  - type: input
+    id: spotify-version
+    attributes:
+      label: Spotify app version / Versi aplikasi Spotify
+      description: Desktop app only. / Hanya aplikasi desktop.
+  - type: input
+    id: track
+    attributes:
+      label: Surah and track played / Surah dan trek yang diputar
+      description: For example "112, Al-Ikhlas". Leave empty if not related. / Misalnya "112, Al-Ikhlas". Kosongkan jika tidak terkait.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, output or screenshots / Log, keluaran, atau tangkapan layar
+      description: Terminal output, error messages, or screenshots. Remove anything personal. / Keluaran terminal, pesan galat, atau tangkapan layar. Hapus hal yang bersifat pribadi.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks / Pemeriksaan
+      options:
+        - label: I read the "Limitations" section of the README. / Saya sudah membaca bagian "Batasan" di README.
+          required: true
+        - label: I searched existing issues. / Saya sudah mencari di issue yang ada.
+          required: true

@@ -1,0 +1,48 @@
+name: Feature request / Permintaan fitur
+description: Suggest an idea or an improvement. / Usulkan ide atau peningkatan.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Simak does not record or store Spotify audio, and does not use the Spotify Web API or SDK. Ideas that need those cannot be accepted without a design discussion first (see CONTRIBUTING).
+        Simak tidak merekam atau menyimpan audio Spotify, dan tidak memakai Spotify Web API atau SDK. Ide yang membutuhkannya tidak bisa diterima tanpa diskusi desain lebih dulu (lihat CONTRIBUTING).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or need / Masalah atau kebutuhan
+      description: What are you trying to do, and what is hard today? / Apa yang ingin Anda lakukan, dan apa yang sulit saat ini?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution / Usulan solusi
+      description: What would you like to see? Sketches are welcome. / Apa yang ingin Anda lihat? Sketsa dipersilakan.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered / Alternatif yang dipertimbangkan
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area / Area
+      options:
+        - UI and window / Tampilan dan jendela
+        - Playback source / Sumber pemutaran
+        - Timing data / Data waktu
+        - Quran text or translation / Teks atau terjemahan Al-Qur'an
+        - Other reciters or juz / Qari atau juz lain
+        - Docs / Dokumentasi
+        - Other / Lainnya
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution / Kontribusi
+      options:
+        - label: I would like to work on this myself (fork and pull request). / Saya ingin mengerjakannya sendiri (fork dan pull request).

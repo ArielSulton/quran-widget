@@ -1,0 +1,89 @@
+name: Platform test report / Laporan uji platform
+description: Report the result of testing Simak on macOS, Windows, Linux or Wayland. / Laporkan hasil menguji Simak di macOS, Windows, Linux, atau Wayland.
+title: "test: "
+labels: ["platform-test"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing. macOS and Windows support is implemented but not yet verified on real machines, and Wayland is untested.
+        Terima kasih sudah menguji. Dukungan macOS dan Windows sudah diimplementasikan tetapi belum diverifikasi di mesin asli, dan Wayland belum diuji.
+
+        How to test / Cara menguji:
+        1. In the Spotify desktop app, play a Juz 30 track without seeking or pausing. / Di aplikasi desktop Spotify, putar trek Juz 30 tanpa seek atau jeda.
+        2. Run / Jalankan: `cd src-tauri && cargo run --release --example accuracy_probe -- --seconds 60`
+        3. On macOS, allow the Spotify control permission dialog and run it again. / Di macOS, izinkan dialog izin kontrol Spotify dan jalankan ulang.
+        4. Then start Simak and watch a few ayah changes. / Lalu jalankan Simak dan perhatikan beberapa pergantian ayat.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system / Sistem operasi
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other / Lainnya
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS name and version / Nama dan versi OS
+      description: For example "macOS 14.5 (Apple silicon)", "Windows 11 23H2", "Fedora 40". / Misalnya "macOS 14.5 (Apple silicon)", "Windows 11 23H2", "Fedora 40".
+    validations:
+      required: true
+  - type: dropdown
+    id: display-server
+    attributes:
+      label: Display server (Linux only) / Display server (khusus Linux)
+      options:
+        - Not applicable / Tidak berlaku
+        - X11
+        - Wayland
+        - Not sure / Tidak yakin
+    validations:
+      required: true
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop environment (Linux only) / Lingkungan desktop (khusus Linux)
+      description: For example "GNOME 46", "KDE Plasma 6". / Misalnya "GNOME 46", "KDE Plasma 6".
+  - type: input
+    id: spotify-version
+    attributes:
+      label: Spotify app version / Versi aplikasi Spotify
+      description: On Windows, say if it is the Microsoft Store app or the .exe installer. / Di Windows, sebutkan apakah dari Microsoft Store atau installer .exe.
+    validations:
+      required: true
+  - type: input
+    id: track
+    attributes:
+      label: Surah and track played / Surah dan trek yang diputar
+      description: For example "112, Al-Ikhlas". / Misalnya "112, Al-Ikhlas".
+    validations:
+      required: true
+  - type: textarea
+    id: probe-output
+    attributes:
+      label: accuracy_probe summary / Ringkasan accuracy_probe
+      description: Paste the whole output, or at least the "RINGKASAN" block. / Tempel seluruh keluaran, atau minimal blok "RINGKASAN".
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: observed-error
+    attributes:
+      label: Observed sync error / Galat sinkron yang teramati
+      description: Does the ayah change earlier or later than the sound, and by about how many seconds? / Apakah ayat berganti lebih cepat atau lebih lambat dari suara, dan kira-kira berapa detik?
+    validations:
+      required: true
+  - type: input
+    id: sync-shift
+    attributes:
+      label: Sync shift you needed ("geser sinkron") / Geser sinkron yang Anda butuhkan
+      description: For example "+0.3 s", or "0, not needed". / Misalnya "+0,3 dtk", atau "0, tidak perlu".
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else / Hal lain
+      description: Does the window, transparency, resize and keyboard shortcuts work? Any crash or odd behavior? / Apakah jendela, transparansi, resize, dan keyboard shortcut berfungsi? Ada crash atau perilaku aneh?

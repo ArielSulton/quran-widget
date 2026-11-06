@@ -1,6 +1,6 @@
 //! Perekam judul track Spotify untuk membuat fixture `tests/fixtures/spotify_titles.json`.
 //!
-//! Pakai: `cargo run --bin dump_titles [path-fixture]`, lalu putar track Juz 30 satu per satu
+//! Pakai: `cargo run --example dump_titles -- [path-fixture]`, lalu putar track Juz 30 satu per satu
 //! di Spotify. Setiap judul baru dicatat sebagai `{"title": ..., "duration_ms": ...}`.
 //! Berhenti dengan Ctrl+C (file ditulis atomik setiap judul baru, jadi aman).
 

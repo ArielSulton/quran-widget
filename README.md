@@ -103,7 +103,7 @@ docs/           gambar, spesifikasi, dan rencana
 Jika Anda punya Mac atau PC Windows dan bersedia membantu memverifikasi: putar sebuah trek Juz 30 di Spotify tanpa seek atau jeda, lalu jalankan
 
 ```bash
-cd src-tauri && cargo run --release --bin accuracy_probe -- --seconds 60
+cd src-tauri && cargo run --release --example accuracy_probe -- --seconds 60
 ```
 
 Alat ini hanya membaca posisi pemutaran (tidak mengirim perintah apa pun) dan mencetak ringkasan deviasi. Di macOS, izinkan dialog izin kontrol Spotify saat pertama kali dan jalankan ulang. Kirim seluruh keluaran (terutama blok "RINGKASAN"), beserta nama dan versi OS, lewat [GitHub Issues](https://github.com/ArielSulton/quran-widget/issues).

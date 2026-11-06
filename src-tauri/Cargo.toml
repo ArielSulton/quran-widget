@@ -20,14 +20,8 @@ tauri-build = { version = "2", features = [] }
 name = "quran-widget"
 path = "src/main.rs"
 
-[[bin]]
-name = "dump_titles"
-path = "src/bin/dump_titles.rs"
-
-[[bin]]
-name = "accuracy_probe"
-path = "src/bin/accuracy_probe.rs"
-
+# dump_titles and accuracy_probe are developer tools: they live in examples/ (not [[bin]]) so the
+# Tauri bundler, which copies every package binary, does not ship them in installers.
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api"] }
 serde = { version = "1", features = ["derive"] }

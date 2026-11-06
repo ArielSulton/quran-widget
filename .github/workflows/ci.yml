@@ -56,6 +56,10 @@ jobs:
       - name: cargo test
         working-directory: src-tauri
         run: cargo test --locked -p quran-widget
+      # Alat pengembang (dump_titles, accuracy_probe) ada di examples/; tesnya tidak ikut `cargo test` biasa.
+      - name: cargo test (examples)
+        working-directory: src-tauri
+        run: cargo test --locked -p quran-widget --examples
       - name: cargo clippy
         working-directory: src-tauri
         run: cargo clippy --locked --all-targets -- -D warnings
@@ -84,7 +88,10 @@ jobs:
           workspaces: src-tauri
       - name: cargo check
         working-directory: src-tauri
-        run: cargo check --locked -p quran-widget --lib --bins
+        run: cargo check --locked -p quran-widget --lib --bins --examples
       - name: cargo test (playback)
         working-directory: src-tauri
         run: cargo test --locked -p quran-widget --lib "playback::"
+      - name: cargo test (examples)
+        working-directory: src-tauri
+        run: cargo test --locked -p quran-widget --examples

@@ -9,7 +9,7 @@
 //!
 //! 1. Buka Spotify dan putar track MANA SAJA (mis. satu surah Juz 30) secara kontinu.
 //!    Selama pengukuran JANGAN seek, jeda, atau ganti track.
-//! 2. `cd src-tauri && cargo run --release --bin accuracy_probe -- --seconds 60`
+//! 2. `cd src-tauri && cargo run --release --example accuracy_probe -- --seconds 60`
 //!    (macOS: izinkan dialog "Simak/Terminal ingin mengontrol Spotify" saat pertama kali;
 //!    jalankan ulang setelah mengizinkan.)
 //! 3. Kirim balik SELURUH keluaran terminal (terutama blok "RINGKASAN") beserta nama dan

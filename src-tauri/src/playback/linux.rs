@@ -7,6 +7,10 @@ use mpris::{PlayerFinder, PlaybackStatus};
 /// atau varian berinstance seperti `spotify.instance123`).
 const PLAYER_PREFIX: &str = "spotify";
 
+/// Batas waktu per panggilan D-Bus ke player (bawaan mpris 500 ms). Dipersingkat agar
+/// Spotify yang menggantung tidak menahan satu `poll` terlalu lama.
+const DBUS_TIMEOUT_MS: i32 = 250;
+
 /// Pemetaan murni dari nilai mentah MPRIS (mikrodetik, string status) ke [`Snapshot`].
 pub fn snapshot_from_mpris(
     title: &str,
@@ -68,8 +72,9 @@ impl PlaybackSource for LinuxSource {
     /// `Snapshot` tetap dikembalikan dengan `duration_ms == 0`; nilai 0 berarti durasi
     /// tidak diketahui. `position_ms` juga 0 bila posisi tidak terbaca.
     fn poll(&mut self) -> Result<Option<Snapshot>, SourceError> {
-        let finder = PlayerFinder::new()
+        let mut finder = PlayerFinder::new()
             .map_err(|e| SourceError::Unavailable(format!("gagal terhubung ke D-Bus: {e}")))?;
+        finder.set_player_timeout_ms(DBUS_TIMEOUT_MS);
 
         let players = finder
             .iter_players()

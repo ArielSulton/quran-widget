@@ -1,15 +1,15 @@
 //! Runtime: loop polling sumber pemutaran + interpolasi, dan pemuatan linimasa.
 
 use crate::engine::{Engine, WidgetState};
-use crate::playback::{PlaybackSource, SourceError};
+use crate::playback::{PlaybackSource, Snapshot, SourceError};
 use crate::timeline::Timeline;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
-/// Irama loop: `poll` = jarak antar pembacaan sumber (tick segar),
-/// `tick` = jarak antar evaluasi ulang (refresh) di antaranya.
+/// Irama loop: `poll` = jarak antar pembacaan sumber (di thread poller),
+/// `tick` = jarak antar evaluasi ulang (refresh) di thread loop.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LoopTiming {
     pub poll: Duration,
@@ -25,49 +25,96 @@ impl Default for LoopTiming {
     }
 }
 
-/// Satu langkah loop yang deterministik (waktu disuntikkan lewat `now`).
-struct Stepper {
+/// Bila tidak ada hasil poll segar lebih lama dari ini, widget kembali ke Waiting
+/// (Spotify menggantung / D-Bus macet) alih-alih terus berinterpolasi pada data basi.
+pub const STALE_AFTER: Duration = Duration::from_secs(2);
+
+/// Waktu tunggu maksimum saat berhenti agar thread poller selesai sebelum dilepas.
+const JOIN_GRACE: Duration = Duration::from_millis(200);
+
+type SharedClock = Arc<dyn Fn() -> Instant + Send + Sync>;
+
+/// Hasil satu poll beserta instan yang dikaitkan dengan posisinya.
+struct PollResult {
+    snap: Option<Snapshot>,
+    /// Titik tengah antara sampel jam sebelum dan sesudah `poll()`: urutan baca
+    /// internal sumber tidak diketahui, jadi titik tengah meminimalkan galat terburuk.
+    at: Instant,
+}
+
+/// Membungkus sumber: sampel jam di sekitar `poll()` dan petakan galat ke Waiting.
+struct Poller {
     source: Box<dyn PlaybackSource>,
-    engine: Engine,
-    poll_every: Duration,
-    last_poll: Option<Instant>,
-    last_emitted: Option<WidgetState>,
+    clock: SharedClock,
     last_error: Option<SourceError>,
 }
 
-impl Stepper {
-    fn new(source: Box<dyn PlaybackSource>, engine: Engine, poll_every: Duration) -> Self {
+impl Poller {
+    fn new(source: Box<dyn PlaybackSource>, clock: SharedClock) -> Self {
         Self {
             source,
-            engine,
-            poll_every,
-            last_poll: None,
-            last_emitted: None,
+            clock,
             last_error: None,
         }
     }
 
-    fn step(&mut self, now: Instant, emit: &mut impl FnMut(WidgetState)) {
-        let due = self
-            .last_poll
-            .is_none_or(|t| now.saturating_duration_since(t) >= self.poll_every);
-        let state = if due {
-            self.last_poll = Some(now);
-            // Galat sumber diperlakukan seperti Ok(None): widget menunggu.
-            let snap = match self.source.poll() {
-                Ok(snap) => {
-                    self.last_error = None;
-                    snap
+    fn poll_once(&mut self) -> PollResult {
+        let before = (self.clock)();
+        let polled = self.source.poll();
+        let after = (self.clock)();
+        let at = before + after.saturating_duration_since(before) / 2;
+        // Galat sumber diperlakukan seperti Ok(None): widget menunggu.
+        let snap = match polled {
+            Ok(snap) => {
+                self.last_error = None;
+                snap
+            }
+            Err(e) => {
+                if self.last_error.as_ref() != Some(&e) {
+                    eprintln!("[runtime] {e}");
+                    self.last_error = Some(e);
                 }
-                Err(e) => {
-                    if self.last_error.as_ref() != Some(&e) {
-                        eprintln!("[runtime] {e}");
-                        self.last_error = Some(e);
-                    }
-                    None
-                }
-            };
-            self.engine.tick(snap, now)
+                None
+            }
+        };
+        PollResult { snap, at }
+    }
+}
+
+/// Satu langkah loop yang deterministik (waktu dan hasil poll disuntikkan).
+struct Stepper {
+    engine: Engine,
+    started: Option<Instant>,
+    last_fresh: Option<Instant>,
+    last_emitted: Option<WidgetState>,
+}
+
+impl Stepper {
+    fn new(engine: Engine) -> Self {
+        Self {
+            engine,
+            started: None,
+            last_fresh: None,
+            // Keadaan awal widget adalah Waiting: tidak perlu dipancarkan ulang.
+            last_emitted: Some(WidgetState::Waiting),
+        }
+    }
+
+    /// `fresh` = hasil poll baru sejak langkah sebelumnya (bila ada).
+    fn step(
+        &mut self,
+        now: Instant,
+        fresh: Option<PollResult>,
+        emit: &mut impl FnMut(WidgetState),
+    ) {
+        let started = *self.started.get_or_insert(now);
+        let state = if let Some(result) = fresh {
+            self.last_fresh = Some(now);
+            // Jangkarkan di instan baca (titik tengah), lalu prediksi sampai `now`.
+            self.engine.tick(result.snap, result.at);
+            self.engine.refresh(now)
+        } else if now.saturating_duration_since(self.last_fresh.unwrap_or(started)) > STALE_AFTER {
+            self.engine.tick(None, now)
         } else {
             // Di antara dua poll: jangan masukkan snapshot basi, cukup interpolasi.
             self.engine.refresh(now)
@@ -84,26 +131,76 @@ pub fn run_loop(
     source: Box<dyn PlaybackSource>,
     engine: Engine,
     emit: impl FnMut(WidgetState),
-    clock: impl Fn() -> Instant,
+    clock: impl Fn() -> Instant + Send + Sync + 'static,
     stop: Arc<AtomicBool>,
 ) {
     run_loop_with(LoopTiming::default(), source, engine, emit, clock, stop)
 }
 
 /// Seperti `run_loop` dengan irama yang dapat diatur (dipakai tes).
+///
+/// `source.poll()` berjalan di thread sendiri dan mengirim hasilnya (dengan instan
+/// titik tengah) ke thread loop, yang tetap `refresh` tiap `tick` meski poll lambat.
+/// Saat `stop` diset, thread poller diberi `JOIN_GRACE` untuk selesai lalu di-join; bila
+/// `poll()` sedang menggantung, thread itu DILEPAS (detach) agar loop tetap kembali cepat;
+/// ia berakhir sendiri begitu `poll()` kembali dan melihat `stop`.
 pub fn run_loop_with(
     timing: LoopTiming,
     source: Box<dyn PlaybackSource>,
     engine: Engine,
     emit: impl FnMut(WidgetState),
-    clock: impl Fn() -> Instant,
+    clock: impl Fn() -> Instant + Send + Sync + 'static,
     stop: Arc<AtomicBool>,
 ) {
     let mut emit = emit;
-    let mut stepper = Stepper::new(source, engine, timing.poll);
+    let clock: SharedClock = Arc::new(clock);
+    let (tx, rx) = mpsc::channel();
+    let done = Arc::new(AtomicBool::new(false));
+
+    let poller_handle = {
+        let (clock, stop, done) = (clock.clone(), stop.clone(), done.clone());
+        std::thread::spawn(move || {
+            poller_loop(Poller::new(source, clock), tx, timing, &stop);
+            done.store(true, Ordering::SeqCst);
+        })
+    };
+
+    let mut stepper = Stepper::new(engine);
     while !stop.load(Ordering::SeqCst) {
-        stepper.step(clock(), &mut emit);
+        let fresh = rx.try_iter().last();
+        stepper.step(clock(), fresh, &mut emit);
         std::thread::sleep(timing.tick);
+    }
+
+    let deadline = Instant::now() + JOIN_GRACE;
+    while !done.load(Ordering::SeqCst) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    if done.load(Ordering::SeqCst) {
+        let _ = poller_handle.join();
+    } // else: poll() menggantung; thread dilepas (lihat dokumentasi di atas).
+}
+
+fn poller_loop(
+    mut poller: Poller,
+    tx: mpsc::Sender<PollResult>,
+    timing: LoopTiming,
+    stop: &AtomicBool,
+) {
+    while !stop.load(Ordering::SeqCst) {
+        let started = (poller.clock)();
+        let result = poller.poll_once();
+        if tx.send(result).is_err() {
+            return; // thread loop sudah selesai
+        }
+        let next = started + timing.poll;
+        while !stop.load(Ordering::SeqCst) {
+            let now = (poller.clock)();
+            if now >= next {
+                break;
+            }
+            std::thread::sleep(timing.tick.min(next - now));
+        }
     }
 }
 
@@ -201,6 +298,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::AtomicUsize;
+    use std::sync::Mutex;
 
     fn ms(n: u64) -> Duration {
         Duration::from_millis(n)
@@ -264,31 +362,60 @@ mod tests {
         }
     }
 
-    fn drive(stepper: &mut Stepper, times: &[Instant]) -> Vec<WidgetState> {
-        let mut emitted = Vec::new();
-        for &t in times {
-            stepper.step(t, &mut |s| emitted.push(s));
+    /// Harness deterministik yang meniru satu iterasi loop: jam palsu, `Poller`, `Stepper`.
+    struct Sim {
+        clock: Arc<Mutex<Instant>>,
+        poller: Poller,
+        stepper: Stepper,
+        emitted: Vec<WidgetState>,
+    }
+
+    impl Sim {
+        fn new(source: Box<dyn PlaybackSource>, clock: Arc<Mutex<Instant>>) -> Self {
+            let shared: SharedClock = {
+                let clock = clock.clone();
+                Arc::new(move || *clock.lock().unwrap())
+            };
+            Self {
+                clock,
+                poller: Poller::new(source, shared),
+                stepper: Stepper::new(engine()),
+                emitted: Vec::new(),
+            }
         }
-        emitted
+
+        /// Satu langkah pada waktu `t`; `poll` = apakah ada hasil poll segar langkah ini.
+        fn step(&mut self, t: Instant, poll: bool) {
+            *self.clock.lock().unwrap() = t;
+            let fresh = poll.then(|| self.poller.poll_once());
+            let now = *self.clock.lock().unwrap(); // poll() bisa memajukan jam
+            let emitted = &mut self.emitted;
+            self.stepper.step(now, fresh, &mut |s| emitted.push(s));
+        }
+    }
+
+    fn sim(
+        results: Vec<Result<Option<Snapshot>, SourceError>>,
+    ) -> (Sim, Instant, Arc<AtomicUsize>) {
+        let t0 = Instant::now();
+        let (source, polls) = FakeSource::new(results);
+        (Sim::new(source, Arc::new(Mutex::new(t0))), t0, polls)
     }
 
     #[test]
     fn emits_intro_ayah_waiting_and_treats_error_as_none() {
-        let (source, polls) = FakeSource::new(vec![
+        let (mut sim, t0, polls) = sim(vec![
             Ok(Some(ikhlas(0, true))),
             Ok(Some(ikhlas(12_000, true))),
             Ok(None),
             Err(SourceError::Unavailable("dbus mati".into())),
         ]);
-        let mut stepper = Stepper::new(source, engine(), ms(250));
-        let t0 = Instant::now();
-        let emitted = drive(
-            &mut stepper,
-            &[t0, t0 + ms(250), t0 + ms(500), t0 + ms(750)],
-        );
+        for i in 0..4 {
+            sim.step(t0 + ms(i * 250), true);
+        }
         assert_eq!(polls.load(Ordering::SeqCst), 4);
         assert_eq!(
-            emitted,
+            sim.emitted,
             vec![
                 showing(Part::Intro, true),
                 showing(Part::Ayah(2), true),
@@ -299,45 +426,41 @@ mod tests {
 
     #[test]
     fn source_error_alone_never_panics_and_yields_waiting() {
-        let (source, _) = FakeSource::new(vec![
+        let (mut sim, t0, _) = sim(vec![
             Err(SourceError::Unavailable("a".into())),
             Err(SourceError::Unavailable("a".into())),
             Err(SourceError::Unavailable("b".into())),
         ]);
-        let mut stepper = Stepper::new(source, engine(), ms(250));
-        let t0 = Instant::now();
-        let emitted = drive(&mut stepper, &[t0, t0 + ms(250), t0 + ms(500)]);
-        assert_eq!(emitted, vec![WidgetState::Waiting]);
+        for i in 0..3 {
+            sim.step(t0 + ms(i * 250), true);
+        }
+        assert!(sim.emitted.is_empty(), "{:?}", sim.emitted);
     }
 
     #[test]
     fn no_duplicate_emits_for_unchanged_state() {
-        let (source, _) = FakeSource::new(vec![
+        let (mut sim, t0, _) = sim(vec![
             Ok(Some(ikhlas(2_000, true))),
             Ok(Some(ikhlas(2_250, true))),
             Ok(Some(ikhlas(2_500, true))),
         ]);
-        let mut stepper = Stepper::new(source, engine(), ms(250));
-        let t0 = Instant::now();
-        let times: Vec<Instant> = (0..15).map(|i| t0 + ms(i * 50)).collect();
-        let emitted = drive(&mut stepper, &times);
-        assert_eq!(emitted, vec![showing(Part::Ayah(1), true)]);
+        for i in 0..15 {
+            sim.step(t0 + ms(i * 50), i % 5 == 0);
+        }
+        assert_eq!(sim.emitted, vec![showing(Part::Ayah(1), true)]);
     }
 
     #[test]
     fn refresh_between_polls_emits_boundary_crossing_before_next_poll() {
         // Poll di 9_900 ms (ayat 1); batas ayat 2 di 10_000 ms terlewati 100 ms kemudian.
-        let (source, polls) = FakeSource::new(vec![Ok(Some(ikhlas(9_900, true)))]);
-        let mut stepper = Stepper::new(source, engine(), ms(250));
-        let t0 = Instant::now();
-        let mut emitted = Vec::new();
-        stepper.step(t0, &mut |s| emitted.push(s));
-        assert_eq!(emitted, vec![showing(Part::Ayah(1), true)]);
-        stepper.step(t0 + ms(50), &mut |s| emitted.push(s));
-        assert_eq!(emitted.len(), 1);
-        stepper.step(t0 + ms(100), &mut |s| emitted.push(s));
+        let (mut sim, t0, polls) = sim(vec![Ok(Some(ikhlas(9_900, true)))]);
+        sim.step(t0, true);
+        assert_eq!(sim.emitted, vec![showing(Part::Ayah(1), true)]);
+        sim.step(t0 + ms(50), false);
+        assert_eq!(sim.emitted.len(), 1);
+        sim.step(t0 + ms(100), false);
         assert_eq!(
-            emitted,
+            sim.emitted,
             vec![showing(Part::Ayah(1), true), showing(Part::Ayah(2), true)]
         );
         // Hanya satu poll sejauh ini: perubahan berasal dari interpolasi.
@@ -345,23 +468,78 @@ mod tests {
     }
 
     #[test]
-    fn polls_only_every_poll_interval() {
-        let (source, polls) = FakeSource::new(vec![]);
-        let mut stepper = Stepper::new(source, engine(), ms(250));
-        let t0 = Instant::now();
-        let times: Vec<Instant> = (0..11).map(|i| t0 + ms(i * 50)).collect(); // 0..=500 ms
-        drive(&mut stepper, &times);
-        assert_eq!(polls.load(Ordering::SeqCst), 3); // 0, 250, 500
+    fn paused_stays_frozen_between_polls() {
+        let (mut sim, t0, _) = sim(vec![Ok(Some(ikhlas(9_950, false)))]);
+        for i in 0..5 {
+            sim.step(t0 + ms(i * 50), i == 0);
+        }
+        assert_eq!(sim.emitted, vec![showing(Part::Ayah(1), false)]);
     }
 
     #[test]
-    fn paused_stays_frozen_between_polls() {
-        let (source, _) = FakeSource::new(vec![Ok(Some(ikhlas(9_950, false)))]);
-        let mut stepper = Stepper::new(source, engine(), ms(250));
+    fn stale_after_two_seconds_without_fresh_poll_goes_waiting_then_recovers() {
+        let (mut sim, t0, _) = sim(vec![
+            Ok(Some(ikhlas(2_000, true))),
+            Ok(Some(ikhlas(12_000, true))),
+        ]);
+        sim.step(t0, true);
+        // Tanpa poll segar: tepat 2000 ms belum basi (batas ketat '>' STALE_AFTER).
+        for i in 1..=40 {
+            sim.step(t0 + ms(i * 50), false);
+        }
+        assert_eq!(STALE_AFTER, ms(2_000));
+        assert_eq!(sim.emitted, vec![showing(Part::Ayah(1), true)]);
+        // 2050 ms: basi => Waiting; tetap Waiting seterusnya (tidak ada emit ganda).
+        sim.step(t0 + ms(2_050), false);
+        sim.step(t0 + ms(2_100), false);
+        assert_eq!(
+            sim.emitted,
+            vec![showing(Part::Ayah(1), true), WidgetState::Waiting]
+        );
+        // Hasil segar pulih ke keadaan yang benar.
+        sim.step(t0 + ms(2_150), true);
+        assert_eq!(
+            sim.emitted,
+            vec![
+                showing(Part::Ayah(1), true),
+                WidgetState::Waiting,
+                showing(Part::Ayah(2), true)
+            ]
+        );
+    }
+
+    #[test]
+    fn never_polled_source_is_waiting_not_a_panic() {
+        // Tanpa hasil sama sekali selama > 2 s: tetap Waiting (keadaan awal, tanpa emit).
+        let (mut sim, t0, _) = sim(vec![]);
+        for i in 0..60 {
+            sim.step(t0 + ms(i * 50), false);
+        }
+        assert!(sim.emitted.is_empty(), "{:?}", sim.emitted);
+    }
+
+    #[test]
+    fn poll_instant_is_the_midpoint_of_the_clock_samples_around_poll() {
         let t0 = Instant::now();
-        let times: Vec<Instant> = (0..5).map(|i| t0 + ms(i * 50)).collect();
-        let emitted = drive(&mut stepper, &times);
-        assert_eq!(emitted, vec![showing(Part::Ayah(1), false)]);
+        let fake = Arc::new(Mutex::new(t0));
+        let source = Box::new(SlowSource {
+            now: fake.clone(),
+            delay: ms(120),
+            position_at_midpoint_ms: 9_900,
+            done: false,
+        });
+        let mut sim = Sim::new(source, fake);
+        // t0 + 120 ms setelah poll; posisi 9_900 dikaitkan ke t0 + 60 ms.
+        sim.step(t0, true);
+        assert_eq!(sim.emitted, vec![showing(Part::Ayah(1), true)]);
+        // 9_900 + (t - (t0 + 60)) mencapai 10_000 tepat di t0 + 160 ms.
+        sim.step(t0 + ms(159), false);
+        assert_eq!(sim.emitted.len(), 1);
+        sim.step(t0 + ms(160), false);
+        assert_eq!(
+            sim.emitted,
+            vec![showing(Part::Ayah(1), true), showing(Part::Ayah(2), true)]
+        );
     }
 
     fn fast() -> LoopTiming {
@@ -432,6 +610,213 @@ mod tests {
             stop,
         );
         assert_eq!(emitted, vec![showing(Part::Intro, true)]);
+    }
+
+    /// Sumber yang memajukan jam palsu sebesar `delay` di dalam `poll`, lalu melaporkan
+    /// posisi yang dibaca di titik tengah poll (model titik tengah).
+    struct SlowSource {
+        now: Arc<Mutex<Instant>>,
+        delay: Duration,
+        position_at_midpoint_ms: u64,
+        done: bool,
+    }
+
+    impl PlaybackSource for SlowSource {
+        fn poll(&mut self) -> Result<Option<Snapshot>, SourceError> {
+            if self.done {
+                return Ok(None);
+            }
+            self.done = true;
+            *self.now.lock().unwrap() += self.delay;
+            Ok(Some(ikhlas(self.position_at_midpoint_ms, true)))
+        }
+    }
+
+    #[test]
+    fn position_is_attributed_to_the_poll_midpoint_not_the_pre_poll_instant() {
+        // poll() makan 120 ms; posisi 9_900 dibaca di titik tengah (t0 + 60 ms).
+        // Kebenaran di t0 + 120 ms = 9_960 => ayat 1. Bila posisi dikaitkan ke t0
+        // (sebelum poll), widget memimpin: 9_900 + 120 = 10_020 => ayat 2 (salah).
+        let t0 = Instant::now();
+        let fake = Arc::new(Mutex::new(t0));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let stop = Arc::new(AtomicBool::new(false));
+        let clock = {
+            let (fake, calls, stop) = (fake.clone(), calls.clone(), stop.clone());
+            move || {
+                if calls.fetch_add(1, Ordering::SeqCst) >= 12 {
+                    stop.store(true, Ordering::SeqCst);
+                }
+                *fake.lock().unwrap()
+            }
+        };
+        let source = Box::new(SlowSource {
+            now: fake.clone(),
+            delay: ms(120),
+            position_at_midpoint_ms: 9_900,
+            done: false,
+        });
+        let timing = LoopTiming {
+            poll: Duration::from_secs(3600),
+            tick: ms(2),
+        };
+        let mut emitted = Vec::new();
+        run_loop_with(timing, source, engine(), |s| emitted.push(s), clock, stop);
+        assert_eq!(emitted, vec![showing(Part::Ayah(1), true)]);
+    }
+
+    /// Sumber yang poll pertamanya cepat lalu poll berikutnya menggantung sampai dilepas.
+    struct HangingSource {
+        first: Option<Snapshot>,
+        release: std::sync::mpsc::Receiver<()>,
+    }
+
+    impl PlaybackSource for HangingSource {
+        fn poll(&mut self) -> Result<Option<Snapshot>, SourceError> {
+            match self.first.take() {
+                Some(s) => Ok(Some(s)),
+                None => {
+                    let _ = self.release.recv_timeout(Duration::from_secs(5));
+                    Ok(None)
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn blocked_poll_does_not_stall_refresh_driven_emits() {
+        // Poll pertama: posisi 9_900 (ayat 1). Poll kedua menggantung 5 s, tetapi batas
+        // ayat 2 (10_000 ms) tercapai ~100 ms kemudian dan harus tampil tanpa menunggu poll.
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let source = Box::new(HangingSource {
+            first: Some(ikhlas(9_900, true)),
+            release: release_rx,
+        });
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop_in_emit = stop.clone();
+        // Pengaman: tes tidak boleh menggantung selamanya bila loop tertahan poll.
+        let watchdog = stop.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_secs(4));
+            watchdog.store(true, Ordering::SeqCst);
+        });
+        let timing = LoopTiming {
+            poll: ms(10),
+            tick: ms(5),
+        };
+        let started = Instant::now();
+        let mut emitted = Vec::new();
+        run_loop_with(
+            timing,
+            source,
+            engine(),
+            |s| {
+                if s == showing(Part::Ayah(2), true) {
+                    stop_in_emit.store(true, Ordering::SeqCst);
+                }
+                emitted.push(s);
+            },
+            Instant::now,
+            stop,
+        );
+        let took = started.elapsed();
+        drop(release_tx);
+        assert_eq!(
+            emitted,
+            vec![showing(Part::Ayah(1), true), showing(Part::Ayah(2), true)]
+        );
+        assert!(took < ms(2_000), "loop tertahan poll: {took:?}");
+    }
+
+    /// Mencatat kapan sumber (dan thread pemiliknya) dibuang.
+    struct DropProbe(Arc<AtomicBool>);
+
+    impl Drop for DropProbe {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    struct ProbedSource {
+        _probe: DropProbe,
+        hang: Option<std::sync::mpsc::Receiver<()>>,
+    }
+
+    impl PlaybackSource for ProbedSource {
+        fn poll(&mut self) -> Result<Option<Snapshot>, SourceError> {
+            if let Some(release) = &self.hang {
+                let _ = release.recv_timeout(Duration::from_secs(5));
+            }
+            Ok(Some(ikhlas(0, true)))
+        }
+    }
+
+    #[test]
+    fn stop_joins_the_poller_thread_so_nothing_leaks() {
+        let dropped = Arc::new(AtomicBool::new(false));
+        let source = Box::new(ProbedSource {
+            _probe: DropProbe(dropped.clone()),
+            hang: None,
+        });
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopper = stop.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(ms(60));
+            stopper.store(true, Ordering::SeqCst);
+        });
+        run_loop_with(fast(), source, engine(), |_| {}, Instant::now, stop);
+        // Sumber hidup di thread poller: sudah dibuang berarti thread itu sudah di-join.
+        assert!(dropped.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn stop_returns_promptly_even_if_poll_is_blocked_and_poller_ends_afterwards() {
+        let dropped = Arc::new(AtomicBool::new(false));
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let source = Box::new(ProbedSource {
+            _probe: DropProbe(dropped.clone()),
+            hang: Some(release_rx),
+        });
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopper = stop.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(ms(50));
+            stopper.store(true, Ordering::SeqCst);
+        });
+        let started = Instant::now();
+        run_loop_with(fast(), source, engine(), |_| {}, Instant::now, stop);
+        let took = started.elapsed();
+        assert!(
+            took < ms(1_500),
+            "loop menunggu poll yang menggantung: {took:?}"
+        );
+        assert!(!dropped.load(Ordering::SeqCst), "poll masih menggantung");
+        // Setelah poll dilepas, thread poller yang dilepas berakhir sendiri (tidak bocor).
+        drop(release_tx);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while !dropped.load(Ordering::SeqCst) && Instant::now() < deadline {
+            std::thread::sleep(ms(5));
+        }
+        assert!(dropped.load(Ordering::SeqCst), "thread poller bocor");
+    }
+
+    #[test]
+    fn poller_thread_polls_on_its_own_cadence() {
+        let (source, polls) = FakeSource::new(vec![Ok(Some(ikhlas(0, true)))]);
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopper = stop.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(ms(300));
+            stopper.store(true, Ordering::SeqCst);
+        });
+        let timing = LoopTiming {
+            poll: ms(50),
+            tick: ms(5),
+        };
+        run_loop_with(timing, source, engine(), |_| {}, Instant::now, stop);
+        let n = polls.load(Ordering::SeqCst);
+        // ~300 ms / 50 ms = 6 poll (+1 awal); batas atas ketat, batas bawah longgar.
+        assert!((2..=8).contains(&n), "jumlah poll {n}");
     }
 
     // ---- load_timelines ----

@@ -3,7 +3,9 @@
 // Logika murni (parser/pemetaan) dikompilasi di semua OS agar teruji di Linux;
 // hanya pemanggilan OS yang dibatasi `cfg`.
 pub mod macos_parse;
+pub mod probe_analysis;
 pub mod process;
+pub mod windows_timeline;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -15,6 +17,11 @@ pub use linux::LinuxSource;
 mod macos;
 #[cfg(target_os = "macos")]
 pub use self::macos::MacSource;
+
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+pub use self::windows::WindowsSource;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
@@ -45,10 +52,10 @@ pub trait PlaybackSource: Send {
 }
 
 /// Stub untuk OS yang tidak didukung (bukan Linux/macOS/Windows, mis. FreeBSD).
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 pub struct UnsupportedSource;
 
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 impl PlaybackSource for UnsupportedSource {
     fn poll(&mut self) -> Result<Option<Snapshot>, SourceError> {
         Err(SourceError::Unavailable(
@@ -67,7 +74,11 @@ pub fn default_source() -> Box<dyn PlaybackSource> {
     {
         Box::new(MacSource::new())
     }
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    #[cfg(target_os = "windows")]
+    {
+        Box::new(WindowsSource::new())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     {
         Box::new(UnsupportedSource)
     }

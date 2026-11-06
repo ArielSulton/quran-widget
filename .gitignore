@@ -8,3 +8,10 @@ __pycache__/
 .pytest_cache/
 .venv/
 .playwright-mcp/
+
+# local-only measurement tools that capture playback audio; intentionally not published
+tools/offset.py
+tools/offset_cont.py
+tools/test_offset.py
+tools/test_offset_cont.py
+.local/

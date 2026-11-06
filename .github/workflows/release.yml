@@ -1,0 +1,104 @@
+# Rilis: dipicu oleh tag `v*` (mis. `git tag v0.1.0 && git push origin v0.1.0`).
+# Membangun installer untuk macOS (universal), Linux, dan Windows lalu membuat RILIS DRAFT di
+# https://github.com/ArielSulton/quran-widget/releases . Draft tidak terlihat publik; pemilik repositori
+# menerbitkannya secara manual setelah memeriksa lampirannya.
+#
+# Belum diverifikasi: workflow ini belum pernah dijalankan.
+#
+# PERINGATAN platform: sumber pemutaran saat ini baru ada untuk Linux (MPRIS). Build macOS/Windows
+# dapat dikompilasi tetapi aplikasinya belum bisa membaca Spotify (lihat README, "Batasan").
+#
+# TANPA penandatanganan kode: tidak ada secret yang dirujuk. Artinya bagi pengguna:
+#   - macOS: Gatekeeper menolak membuka aplikasi tak bertanda/tak ternotarisasi sampai pengguna
+#     mengizinkannya manual (Pengaturan Sistem > Privasi & Keamanan > "Tetap Buka").
+#   - Windows: SmartScreen menampilkan "Windows protected your PC" (Info lebih lanjut > Tetap jalankan).
+#   - Linux: tidak terpengaruh.
+# Untuk menandatangani nanti, tambahkan secret repositori dan buka komentar pada bagian `env:` langkah
+# tauri-action di bawah (lihat https://v2.tauri.app/distribute/sign/macos/ dan .../windows/).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # membuat rilis dan mengunggah lampiran
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+            rust-targets: ""
+          - platform: windows-latest
+            args: ""
+            rust-targets: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pastikan tabel waktu ayat ada
+        shell: bash
+        run: |
+          if ! ls data/timing/*.json >/dev/null 2>&1; then
+            echo "data/timing/*.json belum ada: rilis tanpa tabel waktu tidak berguna." >&2
+            exit 1
+          fi
+
+      - name: Paket sistem (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libdbus-1-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Rust stable terbaru. CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback hanya diperlukan di
+      # mesin lokal dengan Rust 1.88; di CI Cargo.lock yang dikomit dipakai apa adanya.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # --- Penandatanganan (BELUM dikonfigurasi; buka komentar setelah secret dibuat) ---
+          # macOS (sertifikat Developer ID + notarisasi):
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows: konfigurasi bundle.windows.signCommand / sertifikat sesuai dokumentasi Tauri.
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Simak ${{ github.ref_name }}"
+          releaseBody: |
+            Simak ${{ github.ref_name }} (pra-rilis).
+            Installer belum ditandatangani: macOS Gatekeeper dan Windows SmartScreen akan menampilkan peringatan.
+            Baru Linux yang dapat membaca Spotify; dukungan macOS dan Windows belum selesai.
+            Lihat README untuk batasan lengkap.
+          releaseDraft: true
+          prerelease: true
+          args: ${{ matrix.args }}
+          # Catatan: tauri-action tidak membuat berkas checksum. Hitung sendiri sebelum menerbitkan,
+          # mis. `sha256sum Simak_* > SHA256SUMS` lalu unggah ke rilis draft.

@@ -1,0 +1,61 @@
+# Pemeriksaan pada setiap push ke main dan setiap pull request.
+# Tes alat Python (tools/) sengaja TIDAK dijalankan di sini: butuh model dan jaringan.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run
+      - run: npx tsc --noEmit
+
+  rust:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Paket sistem (Tauri + D-Bus untuk MPRIS)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libdbus-1-dev patchelf
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # tauri-build memeriksa folder frontendDist saat kompilasi.
+      - run: npm run build
+      # Catatan: di lokal dipakai CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback karena toolchain
+      # lokal Rust 1.88; di CI dipakai Rust stable terbaru dan Cargo.lock yang sudah dikomit (--locked).
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --locked -p quran-widget
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --locked --all-targets -- -D warnings

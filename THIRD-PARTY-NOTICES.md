@@ -80,6 +80,7 @@ Dependensi langsung (lisensi dibaca dari metadata `cargo metadata` dan `package-
 | serde | 1.0.229 | MIT OR Apache-2.0 | serialisasi |
 | serde_json | 1.0.154 | MIT OR Apache-2.0 | JSON |
 | mpris (Linux saja) | 2.1.0 | Apache-2.0 | membaca pemutaran lewat D-Bus MPRIS |
+| windows (Windows saja) | 0.61.3 | MIT OR Apache-2.0 | membaca pemutaran lewat Windows SMTC |
 | @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT | jembatan antarmuka ke Tauri |
 | @tauri-apps/cli (build) | 2.12.4 | Apache-2.0 OR MIT | pembuatan installer dan ikon |
 | typescript (build) | 5.8.3 | Apache-2.0 | kompilasi antarmuka |

@@ -98,7 +98,7 @@ describe("sizeScale", () => {
   });
 
   it("tidak pernah di bawah 1,0 (penyusutan di bawah ukuran bawaan dilakukan pemilih bertahap)", () => {
-    expect(sizeScale(380, 220)).toBe(1); // jendela minimum 420x260
+    expect(sizeScale(380, 220)).toBe(1); // jendela minimum 430x270
     expect(sizeScale(100, 100)).toBe(1);
     expect(sizeScale(0, 0)).toBe(1);
   });

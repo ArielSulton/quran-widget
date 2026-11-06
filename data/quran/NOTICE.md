@@ -47,4 +47,4 @@ Teks Qur'an: Tanzil Project (https://tanzil.net).
 
 Terjemahan: Kementerian Agama RI (via Tanzil.net, https://tanzil.net/trans/id.indonesian). Syarat dari Tanzil: "The translations provided at this page are for non-commercial purposes only. If used otherwise, you need to obtain necessary permission from the translator or the publisher." Karena itu terjemahan ini hanya boleh dipakai untuk tujuan nonkomersial, dan Simak harus tetap gratis dan tanpa monetisasi.
 
-Lihat juga `THIRD-PARTY-NOTICES.md` di akar repositori untuk seluruh pemberitahuan pihak ketiga, dan `LICENSE-NOTES.md` di folder ini untuk catatan pemeriksaan lisensi.
+Lihat juga `THIRD-PARTY-NOTICES.md` di akar repositori untuk seluruh pemberitahuan pihak ketiga, dan `LICENSE-NOTES.md` untuk catatan pemeriksaan lisensi; berkas itu ada di repositori sumber (`data/quran/LICENSE-NOTES.md`) dan tidak ikut dibundel di salinan terpasang.

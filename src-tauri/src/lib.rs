@@ -6,7 +6,7 @@ pub mod surah;
 pub mod timeline;
 
 use engine::{Engine, WidgetState};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -34,20 +34,44 @@ fn current_state(latest: tauri::State<'_, LatestState>) -> WidgetState {
     latest.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
+/// Memilih folder linimasa: folder resource yang dibundel bila ada, selain itu `dev_fallback`
+/// (hanya ada di build debug; lihat `dev_timing_fallback`). `None` berarti tidak ada folder.
+pub fn pick_timing_dir(
+    bundled: Option<PathBuf>,
+    is_dir: impl Fn(&Path) -> bool,
+    dev_fallback: Option<PathBuf>,
+) -> Option<PathBuf> {
+    match bundled {
+        Some(dir) if is_dir(&dir) => Some(dir),
+        _ => dev_fallback,
+    }
+}
+
+/// `<repo>/data/timing` untuk `tauri dev`. Sengaja HANYA di build debug: di rilis jalur absolut
+/// mesin pembangun tidak boleh ikut tertanam dan tidak boleh dipakai sebagai cadangan diam-diam.
+#[cfg(debug_assertions)]
+fn dev_timing_fallback() -> Option<PathBuf> {
+    Some(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("data")
+            .join("timing"),
+    )
+}
+
+#[cfg(not(debug_assertions))]
+fn dev_timing_fallback() -> Option<PathBuf> {
+    None
+}
+
 /// Folder linimasa: resource Tauri `data/timing`; saat dev jatuh balik ke `<repo>/data/timing`.
-fn timing_dir(app: &tauri::App) -> PathBuf {
+fn timing_dir(app: &tauri::App) -> Option<PathBuf> {
     let bundled = app
         .path()
         .resource_dir()
         .ok()
         .map(|dir| dir.join("data").join("timing"));
-    match bundled {
-        Some(dir) if dir.is_dir() => dir,
-        _ => PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("data")
-            .join("timing"),
-    }
+    pick_timing_dir(bundled, |dir| dir.is_dir(), dev_timing_fallback())
 }
 
 fn stop_loop(app: &tauri::AppHandle) {
@@ -102,8 +126,18 @@ pub fn run() {
             }
         })
         .setup(move |app| {
-            let timelines = runtime::load_timelines(&timing_dir(app));
+            let timelines = match timing_dir(app) {
+                Some(dir) => runtime::load_timelines(&dir),
+                None => Vec::new(),
+            };
             eprintln!("[timing] {} linimasa dimuat", timelines.len());
+            if timelines.is_empty() && !cfg!(debug_assertions) {
+                // Sekali saat start; tanpa ini widget diam-diam menampilkan "Menunggu" selamanya.
+                eprintln!(
+                    "[timing] GALAT: tidak ada berkas linimasa di resource aplikasi (data/timing); \
+                     widget tidak bisa menampilkan ayat. Pasang ulang Simak."
+                );
+            }
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 runtime::run_loop(
@@ -136,7 +170,32 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::linux_webkit_env;
+    use super::{linux_webkit_env, pick_timing_dir};
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn bundled_timing_dir_wins_when_it_exists() {
+        let dev = Some(PathBuf::from("/repo/data/timing"));
+        let got = pick_timing_dir(Some(PathBuf::from("/res/data/timing")), |_| true, dev);
+        assert_eq!(got, Some(PathBuf::from("/res/data/timing")));
+    }
+
+    #[test]
+    fn missing_bundle_falls_back_to_repo_only_in_dev() {
+        let dev = Some(PathBuf::from("/repo/data/timing"));
+        let is_dir = |p: &Path| p == Path::new("/nowhere");
+        assert_eq!(
+            pick_timing_dir(Some(PathBuf::from("/res/data/timing")), is_dir, dev.clone()),
+            dev
+        );
+        assert_eq!(pick_timing_dir(None, is_dir, dev.clone()), dev);
+        // Rilis: tanpa jalur dev, tidak ada folder yang dipakai.
+        assert_eq!(
+            pick_timing_dir(Some(PathBuf::from("/res/data/timing")), is_dir, None),
+            None
+        );
+        assert_eq!(pick_timing_dir(None, is_dir, None), None);
+    }
 
     #[test]
     fn sets_compositing_off_when_unset() {

@@ -9,7 +9,7 @@
 
 **Simak** (from the Indonesian word "simak": to listen with full attention) is a small desktop widget. It shows the Quranic ayah, with its Indonesian translation, that is being recited on a track in the Spotify app. Search name: *Simak Ayat*. Tagline: *Ayat yang sedang dibacakan* (the ayah being recited).
 
-> **Status: pre-release.** There is no download yet. The Linux installer will be available first on the [Releases](https://github.com/ArielSulton/quran-widget/releases) page after the first release is published. The macOS and Windows builds follow after they are verified on real machines.
+> **Status: pre-release.** Installers for Linux, macOS and Windows are on the [Releases](https://github.com/ArielSulton/quran-widget/releases) page. Only Linux is verified. The macOS and Windows builds are experimental and not code-signed, so your OS will show a warning the first time you open them (see below).
 
 ### Screenshots
 
@@ -27,6 +27,18 @@ The images above come from the development preview mode in a browser (with a col
 4. The widget shows the Arabic text and the Indonesian translation by Kementerian Agama RI.
 
 Simak does not use the Spotify API or SDK, does not ask you to log in, and does not play or store any audio.
+
+### Install
+
+Download the file for your system from [Releases](https://github.com/ArielSulton/quran-widget/releases). You need the **Spotify desktop app**, signed in on the same computer. Simak is read-only: it never logs in to Spotify.
+
+| System | File | Notes |
+|---|---|---|
+| Linux | `.deb` (Debian, Ubuntu) or `.AppImage` | AppImage: `chmod +x Simak_*.AppImage` then run it. Verified. |
+| macOS | `.dmg` (universal: Apple silicon and Intel) | Experimental. Drag Simak to Applications. Gatekeeper blocks unsigned apps: right-click Simak, choose Open, or allow it in System Settings > Privacy & Security ("Open Anyway"). macOS asks permission for Simak to control Spotify: allow it. |
+| Windows | `-setup.exe` or `.msi` | Experimental. SmartScreen shows "Windows protected your PC": More info > Run anyway. |
+
+Check a download with the `SHA256SUMS` file on the release page (`sha256sum -c SHA256SUMS` on Linux, `shasum -a 256 -c SHA256SUMS` on macOS).
 
 ### Usage
 
@@ -57,7 +69,7 @@ The sync shift is needed because the playback position that Spotify reports can 
 - **Timing accuracy is not uniform.** `data/timing/_summary.json` records the confidence per surah (17 high, 10 medium, 8 low) and the ayah boundaries that are flagged to be listened to again. Aligning the Spotify track to the reference recording carries an uncertainty of about ±1 second on every default offset (all surahs, not only some), and one case (surah 78, start of the track) has not been confirmed by listening.
 - **Sync is not perfect.** The position that Spotify reports can drift about ±1 second from the audio on some systems, and the ±1 second uncertainty applies to every default offset, not only some surahs. Use the sync shift to adjust. The sync shift value is global per device (one value for all surahs), so tuning it for one surah can shift another surah.
 - **Known issue: four surahs (086, 093, 100, 107) are about 1 second away from their class peers.** The default offsets of these four surahs measure 0.8 to 1.0 second different from the mode of their class (086, 093, 100 on long tracks; 107 on short tracks) and the data is left as measured; it has not been confirmed by listening which is right (their clips are on the listening priority list in `tools/spotcheck.py --flagged`). If the ayahs of these surahs feel early or late, correct it with the sync shift.
-- **Only Linux is verified.** The macOS (osascript) and Windows (SMTC) playback sources are implemented, but not verified on real machines: they are only proven to compile and pass the pure tests in CI. Linux was verified on one X11/GNOME machine only; Wayland is untested. So the macOS/Windows builds are experimental and are not part of the normal release.
+- **Only Linux is verified.** The macOS (osascript) and Windows (SMTC) playback sources are implemented, but not verified on real machines: they are only proven to compile and pass the pure tests in CI. Linux was verified on one X11/GNOME machine only; Wayland is untested. So the macOS/Windows builds are experimental. They are in the release, but unsigned: macOS Gatekeeper and Windows SmartScreen warn on first launch.
 - **Background blur is not verified.** System-level blur is designed for macOS only (untested). On Linux there is no blur behind the window, and on Windows it is not verified; without blur, the card uses a more solid fill so the text stays readable over any wallpaper, so it does not look as glass-like as in the images above.
 - **Minimum window size 430 x 270.** Anything smaller is not supported: long ayahs no longer fit without a font that is too small, or the text touches the control pill. At the minimum, the default and two larger sizes, all 564 ayahs of Juz 30 were checked to fit without being cut off and without colliding with the control pill, the handle or the footer (`node scripts/layout-sweep.mjs`, see below). That check was done in headless Chrome only; it has not been done in WebKitGTK, WKWebView or WebView2 (the web engines the real app uses), which may measure Arabic text slightly differently.
 - **Linux: WebKit compositing is disabled.** In a transparent window on WebKitGTK, leftover letters or boxes from the previous ayah can stay at the edge of the card after the ayah changes (confirmed on X11/GNOME, Intel/Mesa, WebKitGTK 2.50). So on Linux Simak sets `WEBKIT_DISABLE_COMPOSITING_MODE=1` before WebKit starts. The trade-off: GPU compositing for the web view is off, so animation can be less smooth and `backdrop-filter` cannot be relied on (Linux already uses a solid card without blur). If you already set the variable yourself, your value is respected. To opt out: `WEBKIT_DISABLE_COMPOSITING_MODE=0 simak` (the binary name of the installed package is set by `mainBinaryName` in `tauri.conf.json`; development builds use the cargo name `quran-widget`). The effect on other machines is not verified.
@@ -160,7 +172,7 @@ Bug reports and suggestions: [GitHub Issues](https://github.com/ArielSulton/qura
 
 **Simak** (dari kata "simak": mendengarkan dengan penuh perhatian) adalah widget desktop kecil yang menampilkan ayat Al-Qur'an beserta terjemahan Indonesia yang sedang dibacakan pada trek di aplikasi Spotify. Nama pencarian: *Simak Ayat*. Tagline: *Ayat yang sedang dibacakan*.
 
-> **Status: pra-rilis.** Belum ada unduhan. Installer Linux akan tersedia lebih dulu di halaman [Releases](https://github.com/ArielSulton/quran-widget/releases) setelah rilis pertama diterbitkan; build macOS dan Windows menyusul setelah diverifikasi di mesin asli.
+> **Status: pra-rilis.** Installer Linux, macOS, dan Windows tersedia di halaman [Releases](https://github.com/ArielSulton/quran-widget/releases). Baru Linux yang terverifikasi. Build macOS dan Windows bersifat eksperimental dan belum code-signed, jadi OS Anda menampilkan peringatan saat pertama dibuka (lihat di bawah).
 
 ### Tampilan
 
@@ -178,6 +190,18 @@ Gambar di atas dibuat dari mode pratinjau pengembangan di browser (dengan latar 
 4. Widget menampilkan teks Arab dan terjemahan Kementerian Agama RI.
 
 Simak tidak memakai API atau SDK Spotify, tidak meminta login, dan tidak memutar atau menyimpan audio apa pun.
+
+### Pasang
+
+Unduh file untuk sistem Anda dari [Releases](https://github.com/ArielSulton/quran-widget/releases). Anda butuh **aplikasi desktop Spotify** yang sudah login di komputer yang sama. Simak bersifat read-only: tidak pernah login ke Spotify.
+
+| Sistem | File | Catatan |
+|---|---|---|
+| Linux | `.deb` (Debian, Ubuntu) atau `.AppImage` | AppImage: `chmod +x Simak_*.AppImage` lalu jalankan. Terverifikasi. |
+| macOS | `.dmg` (universal: Apple silicon dan Intel) | Eksperimental. Seret Simak ke Applications. Gatekeeper memblokir aplikasi tak bertanda: klik kanan Simak lalu pilih Open, atau izinkan di System Settings > Privacy & Security ("Open Anyway"). macOS meminta izin agar Simak mengontrol Spotify: izinkan. |
+| Windows | `-setup.exe` atau `.msi` | Eksperimental. SmartScreen menampilkan "Windows protected your PC": More info > Run anyway. |
+
+Periksa unduhan dengan file `SHA256SUMS` di halaman rilis (`sha256sum -c SHA256SUMS` di Linux, `shasum -a 256 -c SHA256SUMS` di macOS).
 
 ### Cara pakai
 
@@ -208,7 +232,7 @@ Geser sinkron perlu karena posisi pemutaran yang dilaporkan Spotify bisa berbeda
 - **Ketelitian tabel waktu tidak seragam.** `data/timing/_summary.json` mencatat tingkat keyakinan per surah (17 tinggi, 10 sedang, 8 rendah) dan batas ayat yang ditandai untuk didengarkan ulang. Penyelarasan trek Spotify terhadap rekaman rujukan membawa ketidakpastian sekitar ±1 detik pada setiap offset bawaan (semua surah, bukan hanya sebagian), dan satu kasus (surah 78, awal trek) belum dipastikan dengan didengarkan.
 - **Sinkron tidak sempurna.** Posisi yang dilaporkan Spotify bisa bergeser sekitar ±1 detik dari audio pada sebagian sistem, dan ketidakpastian ±1 detik itu berlaku untuk setiap offset bawaan, bukan hanya sebagian surah. Gunakan geser sinkron untuk menyesuaikan. Nilai geser sinkron berlaku global per perangkat (satu nilai untuk semua surah), jadi menyetelnya untuk satu surah bisa menggeser surah lain.
 - **Masalah yang diketahui: empat surah (086, 093, 100, 107) berjarak sekitar 1 detik dari surah sekelasnya.** Offset bawaan keempat surah itu terukur 0,8 sampai 1,0 detik berbeda dari modus kelasnya (086, 093, 100 pada trek panjang; 107 pada trek pendek) dan data dibiarkan apa adanya sesuai pengukuran; belum dipastikan dengan didengarkan mana yang tepat (klipnya masuk daftar prioritas dengar di `tools/spotcheck.py --flagged`). Bila ayat pada surah-surah ini terasa lebih cepat atau lambat, koreksi dengan geser sinkron.
-- **Baru Linux yang terverifikasi.** Sumber pemutaran macOS (osascript) dan Windows (SMTC) sudah diimplementasikan, tetapi belum diverifikasi di mesin asli: baru terbukti kompilasi dan lulus test murni di CI. Linux diverifikasi di satu mesin X11/GNOME saja; Wayland belum diuji. Karena itu build macOS/Windows bersifat eksperimental dan tidak ikut rilis biasa.
+- **Baru Linux yang terverifikasi.** Sumber pemutaran macOS (osascript) dan Windows (SMTC) sudah diimplementasikan, tetapi belum diverifikasi di mesin asli: baru terbukti kompilasi dan lulus test murni di CI. Linux diverifikasi di satu mesin X11/GNOME saja; Wayland belum diuji. Karena itu build macOS/Windows bersifat eksperimental. Keduanya ikut rilis, tetapi belum ditandatangani: macOS Gatekeeper dan Windows SmartScreen memberi peringatan saat pertama dibuka.
 - **Blur latar belum diverifikasi.** Blur tingkat sistem hanya dirancang untuk macOS (belum diuji). Di Linux tidak ada blur di belakang jendela, dan di Windows belum diverifikasi; tanpa blur, kartu memakai isian yang lebih pekat agar teks tetap terbaca di atas wallpaper apa pun, jadi tampilannya tidak semirip kaca seperti pada gambar di atas.
 - **Ukuran jendela minimum 430 x 270.** Lebih kecil dari itu tidak didukung: ayat panjang tidak lagi muat tanpa font yang terlalu kecil atau teksnya menyentuh pil kontrol. Pada ukuran minimum, bawaan, dan dua ukuran lebih besar, seluruh 564 ayat Juz 30 diperiksa muat tanpa terpotong dan tanpa bertabrakan dengan pil kontrol, pegangan, atau footer (`node scripts/layout-sweep.mjs`, lihat bawah). Pemeriksaan itu dilakukan di Chrome tanpa kepala (headless); belum di WebKitGTK, WKWebView, atau WebView2 (mesin web yang dipakai aplikasi sebenarnya), yang bisa mengukur teks Arab sedikit berbeda.
 - **Linux: compositing WebKit dimatikan.** Di jendela transparan pada WebKitGTK, sisa huruf atau kotak dari ayat sebelumnya bisa tertinggal di tepi kartu setelah ayat berganti (dipastikan di X11/GNOME, Intel/Mesa, WebKitGTK 2.50). Karena itu di Linux Simak menyetel `WEBKIT_DISABLE_COMPOSITING_MODE=1` sebelum WebKit dimulai. Kompromi: compositing GPU untuk tampilan web dimatikan, sehingga animasi bisa kurang mulus dan `backdrop-filter` tidak bisa diandalkan (Linux memang sudah memakai kartu solid tanpa blur). Bila variabel itu sudah Anda setel sendiri, nilai Anda dihormati. Untuk memilih keluar: `WEBKIT_DISABLE_COMPOSITING_MODE=0 simak` (nama binary paket terpasang diatur lewat `mainBinaryName` di `tauri.conf.json`; build pengembangan memakai nama cargo `quran-widget`). Efek pada mesin lain belum diverifikasi.

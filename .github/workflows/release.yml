@@ -1,16 +1,13 @@
 # Rilis: dipicu oleh tag `v*` (mis. `git tag v0.1.0 && git push origin v0.1.0`).
 #
-# Secara bawaan (push tag) HANYA build Linux (ubuntu-22.04) yang dibuat. Itulah satu-satunya build
-# yang sumber pemutarannya sudah diverifikasi di mesin asli. Sumber pemutaran macOS (osascript) dan
-# Windows (SMTC) sudah diimplementasikan tetapi BELUM diverifikasi di mesin asli (baru terbukti
-# kompilasi dan tes murni di CI), jadi installer macOS/Windows bersifat eksperimental dan tidak
-# dibuat pada rilis biasa. Untuk membuatnya: Actions > Release > "Run workflow", pilih TAG (bukan
-# cabang) pada "Use workflow from", lalu centang `include_experimental`.
+# Push tag membangun ketiga platform: Linux (ubuntu-22.04), macOS (universal) dan Windows.
+# Linux adalah satu-satunya yang sumber pemutarannya sudah diverifikasi di mesin asli. Sumber
+# pemutaran macOS (osascript) dan Windows (SMTC) sudah diimplementasikan tetapi BELUM diverifikasi di
+# mesin asli (baru terbukti kompilasi dan tes murni di CI), jadi installer macOS/Windows bersifat
+# eksperimental; rilis dan landing page menyebutnya begitu.
 #
 # Hasilnya adalah RILIS DRAFT di https://github.com/ArielSulton/quran-widget/releases . Draft tidak
 # terlihat publik; pemilik repositori menerbitkannya secara manual setelah memeriksa lampirannya.
-#
-# Belum diverifikasi: workflow ini belum pernah dijalankan.
 #
 # TANPA penandatanganan kode: tidak ada secret yang dirujuk. Artinya bagi pengguna:
 #   - macOS: Gatekeeper menolak membuka aplikasi tak bertanda/tak ternotarisasi sampai pengguna
@@ -27,44 +24,27 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Untuk membangun ulang sebuah tag: Actions > Release > "Run workflow", pilih TAG (bukan cabang).
   workflow_dispatch:
-    inputs:
-      include_experimental:
-        description: "Sertakan build macOS dan Windows (eksperimental, belum diverifikasi di mesin asli)"
-        type: boolean
-        default: false
 
 permissions:
   contents: write # membuat rilis dan mengunggah lampiran
 
 jobs:
-  # Menyusun matriks: Linux selalu; macOS (universal) dan Windows hanya bila diminta lewat
-  # workflow_dispatch. `matrix` tidak bisa dipakai di `if:` tingkat job, jadi matriksnya dibuat di sini.
-  plan:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-    steps:
-      - id: plan
-        env:
-          INCLUDE_EXPERIMENTAL: ${{ inputs.include_experimental }}
-        run: |
-          linux='{"platform":"ubuntu-22.04","args":"","rust-targets":""}'
-          mac='{"platform":"macos-latest","args":"--target universal-apple-darwin","rust-targets":"aarch64-apple-darwin,x86_64-apple-darwin"}'
-          win='{"platform":"windows-latest","args":"","rust-targets":""}'
-          if [ "$INCLUDE_EXPERIMENTAL" = "true" ]; then
-            echo "matrix={\"include\":[$linux,$mac,$win]}" >> "$GITHUB_OUTPUT"
-          else
-            echo "matrix={\"include\":[$linux]}" >> "$GITHUB_OUTPUT"
-          fi
-
   release:
-    needs: plan
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: ""
+            rust-targets: ""
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+            rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+          - platform: windows-latest
+            args: ""
+            rust-targets: ""
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Pastikan dijalankan dari tag
@@ -147,8 +127,8 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Simak ${{ github.ref_name }}"
           releaseBody: |
-            Simak ${{ github.ref_name }} (pra-rilis).
-            Sumber pemutaran Linux diverifikasi di satu mesin (X11/GNOME); installer belum pernah dicoba. Build macOS dan Windows (bila ada di rilis ini) bersifat eksperimental: dukungan pemutarannya sudah diimplementasikan tetapi belum diverifikasi di mesin asli.
+            Simak ${{ github.ref_name }} (pre-release).
+            Linux: sumber pemutaran diverifikasi di satu mesin (X11/GNOME). macOS dan Windows: eksperimental, dukungan pemutarannya sudah diimplementasikan tetapi belum diverifikasi di mesin asli. Kirim platform test report lewat issue.
             Installer belum ditandatangani: macOS Gatekeeper dan Windows SmartScreen akan menampilkan peringatan.
             Lihat README untuk batasan lengkap.
           releaseDraft: true

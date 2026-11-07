@@ -15,7 +15,7 @@ describe("arabicFontPx", () => {
   });
 
   it("memberi 20 px (lantai) untuk ayat terpanjang Juz 30 (Al-Bayyinah 98:8)", () => {
-    expect(longest.length).toBe(179);
+    expect(longest.length).toBe(183);
     expect(arabicFontPx(longest)).toBe(FONT_MIN_PX);
     expect(FONT_MIN_PX).toBe(20);
   });

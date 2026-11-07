@@ -11,6 +11,17 @@ export const BASMALAH: { ar: string; id: string } = {
   id: "Dengan nama Allah Yang Maha Pengasih, Maha Penyayang.",
 };
 
+const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+
+/**
+ * Penanda akhir ayat: U+06DD (tanda akhir ayat) langsung disusul nomor ayat dalam angka
+ * Arab-Hindi. Ini hanya tampilan; teks Tanzil di data tetap persis seperti aslinya.
+ */
+export function endOfAyah(n: number): string {
+  const digits = String(n).replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]);
+  return `\u06DD${digits}`;
+}
+
 export type ViewModel = { arabic: string; translation: string; footer: string };
 
 export function viewModel(s: WidgetState, q: QuranData): ViewModel {
@@ -31,7 +42,8 @@ export function viewModel(s: WidgetState, q: QuranData): ViewModel {
 
   const ayah = surah?.ayat[s.part.ayah - 1];
   return {
-    arabic: ayah?.ar ?? "",
+    // NBSP menjaga penanda tetap menempel pada kata terakhir saat baris dipatahkan.
+    arabic: ayah ? `${ayah.ar}\u00A0${endOfAyah(s.part.ayah)}` : "",
     translation: ayah?.id ?? "",
     footer: `${name} · ${s.surah}:${s.part.ayah}`,
   };

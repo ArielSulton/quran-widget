@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BASMALAH, viewModel, type QuranData, type WidgetState } from "./viewModel";
+import { BASMALAH, endOfAyah, viewModel, type QuranData, type WidgetState } from "./viewModel";
 
 const q: QuranData = {
   112: {
@@ -10,6 +10,14 @@ const q: QuranData = {
     ],
   },
 };
+
+describe("endOfAyah", () => {
+  it("memberi U+06DD lalu nomor ayat dalam angka Arab-Hindi", () => {
+    expect(endOfAyah(1)).toBe("\u06DD١");
+    expect(endOfAyah(40)).toBe("\u06DD٤٠");
+    expect(endOfAyah(179)).toBe("\u06DD١٧٩");
+  });
+});
 
 describe("viewModel", () => {
   it("menampilkan teks menunggu saat state waiting", () => {
@@ -38,7 +46,7 @@ describe("viewModel", () => {
       playing: true,
     };
     expect(viewModel(s, q)).toEqual({
-      arabic: q[112].ayat[0].ar,
+      arabic: `${q[112].ayat[0].ar}\u00A0\u06DD١`,
       translation: q[112].ayat[0].id,
       footer: "Al-Ikhlas · 112:1",
     });

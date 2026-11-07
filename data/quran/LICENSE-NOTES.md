@@ -3,7 +3,7 @@
 Checked 2026-11-06. Intended use: redistribution inside a free, open, non-commercial desktop widget.
 
 ## (a) Arabic text: Tanzil Quran Text (Uthmani, v1.1)
-- Source: https://tanzil.net/download/ (file `quran-uthmani.txt`, "Text with aya numbers"); terms at https://tanzil.net/docs/text_license
+- Source: https://tanzil.net/download/ (file `quran-uthmani.txt`, "Text with aya numbers", with the options "Include pause marks" and "Include sajdah signs" ON, so the waqf signs and the sajdah sign are kept); terms at https://tanzil.net/docs/text_license
 - License: Creative Commons Attribution 3.0. Copyright (C) 2007-2026 Tanzil Project. Terms from the file header:
   - "Permission is granted to copy and distribute verbatim copies of this text, but CHANGING IT IS NOT ALLOWED."
   - "This Quran text can be used in any website or application, provided that its source (Tanzil Project) is clearly indicated, and a link is made to tanzil.net to enable users to keep track of changes."
@@ -28,7 +28,7 @@ Not used: a usable source with clear terms (Tanzil) was found, and no additional
 ## Reproducing the data
 ```
 mkdir /tmp/quran-src   # new empty dir
-curl -L -o /tmp/quran-src/quran-uthmani.txt "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true"
+curl -L -o /tmp/quran-src/quran-uthmani.txt "https://tanzil.net/pub/download/index.php?quranType=uthmani&marks=true&sajdah=true&outType=txt-2&agree=true"
 curl -L -o /tmp/quran-src/id.indonesian.txt "https://tanzil.net/trans/?transID=id.indonesian&type=txt-2"
 python3 -I tools/build_quran_data.py /tmp/quran-src/quran-uthmani.txt /tmp/quran-src/id.indonesian.txt data/quran/juz30.json
 python3 -I tools/check_quran_data.py

@@ -4,7 +4,7 @@ Usage:
   python3 -I tools/build_quran_data.py QURAN_UTHMANI_TXT TRANSLATION_ID_TXT OUT_JSON
 
 Inputs are Tanzil 'txt-2' files (lines `surah|ayah|text`, '#' comment lines):
-  quran-uthmani.txt  (https://tanzil.net/download/, Uthmani, Text with aya numbers)
+  quran-uthmani.txt  (https://tanzil.net/download/, Uthmani, Text with aya numbers, with pause marks and sajdah signs included: marks=true&sajdah=true)
   id.indonesian.txt  (https://tanzil.net/trans/id.indonesian, Kemenag RI)
 Text is copied verbatim, except that the basmala Tanzil prepends to ayah 1 of each
 surah (except 1 and 9) is removed, because it is not part of ayah 1.

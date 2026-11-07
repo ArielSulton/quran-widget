@@ -1,6 +1,6 @@
 /** Ukuran font Arab penuh untuk ayat pendek. */
 export const FONT_MAX_PX = 34;
-/** Lantai ukuran font: ayat terpanjang Juz 30 (98:8, 179 karakter) tetap terbaca. */
+/** Lantai ukuran font: ayat terpanjang Juz 30 (98:8, 183 karakter dengan waqf sign) tetap terbaca. */
 export const FONT_MIN_PX = 20;
 
 /** Sampai panjang ini (karakter) ayat memakai ukuran penuh. */

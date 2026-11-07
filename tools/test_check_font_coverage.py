@@ -53,7 +53,7 @@ def test_bundled_font_covers_all_used_codepoints_and_has_mark_positioning():
 
 
 def test_bundled_font_also_covers_the_whole_quranic_annotation_range():
-    """Juz 30 has no waqf signs, but later juz and other text do (U+06D6..U+06DC etc.)."""
+    """Juz 30 uses U+06D6, U+06DA, U+06DC and U+06E9; the rest of the range is covered for later juz."""
     quranic = set(range(0x06D6, 0x06DD)) | set(range(0x06DF, 0x06E9)) | set(range(0x06EA, 0x06EE))
     quranic.add(0x0670)
     assert cfc.check_font(FONT, quranic) == []

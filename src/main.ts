@@ -3,7 +3,7 @@ import juz30 from "../data/quran/juz30.json";
 import { initControls } from "./controls";
 import { footerScale, layoutCandidates, pickLayout, sizeScale, translationScale, type Layout } from "./density";
 import { arabicFontPx } from "./fit";
-import { detectMaterial, isMacPlatform } from "./material";
+import { detectMaterial, isLinuxPlatform, isMacPlatform } from "./material";
 import { parsePreview } from "./preview";
 import { loadSync, saveSync } from "./sync";
 import { loadTheme, resolveTheme, saveTheme, type KeyValueStore, type ThemePref } from "./theme";
@@ -86,6 +86,21 @@ function applyLayout(vm: ReturnType<typeof viewModel>): void {
 function paintText(vm: ReturnType<typeof viewModel>): void {
   shownVm = vm;
   arabicEl.textContent = vm.arabic;
+  if (vm.ayahNo) {
+    // NBSP menjaga penanda tetap menempel pada kata terakhir saat baris dipatahkan.
+    const mark = document.createElement("span");
+    mark.className = "ayah-end";
+    mark.dataset.len = String(vm.ayahNo.length);
+    mark.setAttribute("aria-hidden", "true");
+    const ring = document.createElement("span");
+    ring.className = "ring";
+    ring.textContent = "\u06DD";
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = vm.ayahNo;
+    mark.append(ring, num);
+    arabicEl.append("\u00A0", mark);
+  }
   arabicEl.style.setProperty("--arabic-px", `${arabicFontPx(vm.arabic)}px`);
   translationEl.textContent = vm.translation;
   applyLayout(vm);
@@ -175,6 +190,9 @@ const material =
     backdropFilter,
   });
 root.dataset.material = material;
+// Linux (WebKitGTK, compositing mati): piksel setengah transparan (bayangan, isian) digambar berulang
+// tanpa dibersihkan dan makin pekat; style.css membuat kartu buram penuh tanpa bayangan di sini.
+if (isTauri && isLinuxPlatform(navigator.platform, navigator.userAgent)) root.dataset.os = "linux";
 if (preview?.backdrop) root.dataset.backdrop = "";
 if (preview?.controls) root.dataset.controls = "";
 

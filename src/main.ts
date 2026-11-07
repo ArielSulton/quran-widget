@@ -86,6 +86,21 @@ function applyLayout(vm: ReturnType<typeof viewModel>): void {
 function paintText(vm: ReturnType<typeof viewModel>): void {
   shownVm = vm;
   arabicEl.textContent = vm.arabic;
+  if (vm.ayahNo) {
+    // NBSP menjaga penanda tetap menempel pada kata terakhir saat baris dipatahkan.
+    const mark = document.createElement("span");
+    mark.className = "ayah-end";
+    mark.dataset.len = String(vm.ayahNo.length);
+    mark.setAttribute("aria-hidden", "true");
+    const ring = document.createElement("span");
+    ring.className = "ring";
+    ring.textContent = "\u06DD";
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = vm.ayahNo;
+    mark.append(ring, num);
+    arabicEl.append("\u00A0", mark);
+  }
   arabicEl.style.setProperty("--arabic-px", `${arabicFontPx(vm.arabic)}px`);
   translationEl.textContent = vm.translation;
   applyLayout(vm);

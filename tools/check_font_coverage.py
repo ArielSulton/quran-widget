@@ -32,7 +32,7 @@ def _basmalah() -> str:
 
 
 def _end_of_ayah_chars() -> str:
-    """Characters src/viewModel.ts adds around each ayah: NBSP, U+06DD and the Arabic-Indic digits."""
+    """Characters the UI adds around each ayah (src/main.ts): NBSP, U+06DD and the Arabic-Indic digits of src/viewModel.ts."""
     src = VIEW_MODEL.read_text(encoding="utf-8")
     digits = re.search(r'ARABIC_INDIC_DIGITS\s*=\s*"([^"]+)"', src)
     if not digits:

@@ -171,6 +171,28 @@ html[data-material="native"] #widget {
   display: none;
 }
 
+/* Penanda akhir ayat: lingkaran U+06DD dari font, angka digambar di atasnya (ligature font tidak
+   memasukkan angka ke lingkaran di WebKitGTK). Semua ukuran dalam em, jadi ikut skala font Arab. */
+#arabic .ayah-end {
+  display: inline-grid;
+  place-items: center;
+  white-space: nowrap;
+}
+#arabic .ayah-end > * {
+  grid-area: 1 / 1;
+  line-height: 1;
+}
+#arabic .ayah-end .num {
+  font-size: 0.5em;
+  direction: ltr;
+  unicode-bidi: isolate;
+  transform: translateY(0.48em);
+}
+#arabic .ayah-end[data-len="3"] .num {
+  font-size: 0.38em;
+  transform: translateY(0.63em);
+}
+
 #translation {
   margin-top: calc(20px * var(--tr-scale, 1));
   font-size: calc(14.5px * var(--tr-scale, 1));

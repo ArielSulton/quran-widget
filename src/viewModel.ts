@@ -14,19 +14,19 @@ export const BASMALAH: { ar: string; id: string } = {
 const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
 /**
- * Penanda akhir ayat: U+06DD (tanda akhir ayat) langsung disusul nomor ayat dalam angka
- * Arab-Hindi. Ini hanya tampilan; teks Tanzil di data tetap persis seperti aslinya.
+ * Nomor ayat dalam angka Arab-Hindi untuk penanda akhir ayat. Lingkarannya (U+06DD) dan
+ * penempatan angka di dalamnya digambar UI (main.ts, style.css), bukan oleh ligature font,
+ * karena WebKitGTK tidak memasukkan angka ke dalam lingkaran. Teks Tanzil di data tetap utuh.
  */
-export function endOfAyah(n: number): string {
-  const digits = String(n).replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]);
-  return `\u06DD${digits}`;
+export function ayahNumber(n: number): string {
+  return String(n).replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]);
 }
 
-export type ViewModel = { arabic: string; translation: string; footer: string };
+export type ViewModel = { arabic: string; ayahNo: string; translation: string; footer: string };
 
 export function viewModel(s: WidgetState, q: QuranData): ViewModel {
   if (s.kind === "waiting") {
-    return { arabic: "", translation: "Menunggu bacaan Al-Qur'an", footer: "" };
+    return { arabic: "", ayahNo: "", translation: "Menunggu bacaan Al-Qur'an", footer: "" };
   }
 
   const surah = q[s.surah];
@@ -35,6 +35,7 @@ export function viewModel(s: WidgetState, q: QuranData): ViewModel {
   if (s.part.kind === "intro") {
     return {
       arabic: BASMALAH.ar,
+      ayahNo: "",
       translation: BASMALAH.id,
       footer: `${name} · mukadimah`,
     };
@@ -42,8 +43,8 @@ export function viewModel(s: WidgetState, q: QuranData): ViewModel {
 
   const ayah = surah?.ayat[s.part.ayah - 1];
   return {
-    // NBSP menjaga penanda tetap menempel pada kata terakhir saat baris dipatahkan.
-    arabic: ayah ? `${ayah.ar}\u00A0${endOfAyah(s.part.ayah)}` : "",
+    arabic: ayah?.ar ?? "",
+    ayahNo: ayah ? ayahNumber(s.part.ayah) : "",
     translation: ayah?.id ?? "",
     footer: `${name} · ${s.surah}:${s.part.ayah}`,
   };

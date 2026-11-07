@@ -3,7 +3,7 @@ import juz30 from "../data/quran/juz30.json";
 import { initControls } from "./controls";
 import { footerScale, layoutCandidates, pickLayout, sizeScale, translationScale, type Layout } from "./density";
 import { arabicFontPx } from "./fit";
-import { detectMaterial, isMacPlatform } from "./material";
+import { detectMaterial, isLinuxPlatform, isMacPlatform } from "./material";
 import { parsePreview } from "./preview";
 import { loadSync, saveSync } from "./sync";
 import { loadTheme, resolveTheme, saveTheme, type KeyValueStore, type ThemePref } from "./theme";
@@ -190,6 +190,9 @@ const material =
     backdropFilter,
   });
 root.dataset.material = material;
+// Linux (WebKitGTK, compositing mati): piksel setengah transparan (bayangan, isian) digambar berulang
+// tanpa dibersihkan dan makin pekat; style.css membuat kartu buram penuh tanpa bayangan di sini.
+if (isTauri && isLinuxPlatform(navigator.platform, navigator.userAgent)) root.dataset.os = "linux";
 if (preview?.backdrop) root.dataset.backdrop = "";
 if (preview?.controls) root.dataset.controls = "";
 

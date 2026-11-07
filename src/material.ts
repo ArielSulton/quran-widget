@@ -20,6 +20,11 @@ export function isMacPlatform(platform: string, userAgent: string): boolean {
   return /^Mac/i.test(platform) || /Macintosh|Mac OS X/i.test(userAgent);
 }
 
+/** Linux (X11/Wayland) menurut `navigator.platform` atau userAgent; Android tidak dihitung. */
+export function isLinuxPlatform(platform: string, userAgent: string): boolean {
+  return (/^Linux/i.test(platform) || /Linux/i.test(userAgent)) && !/Android/i.test(userAgent);
+}
+
 export function detectMaterial(env: MaterialEnv): Material {
   if (env.tauri && env.mac) return "native";
   if (!env.tauri && env.backdropFilter) return "css";

@@ -57,6 +57,20 @@ html[data-material="solid"][data-theme="dark"] {
   --pill-fill: rgba(62, 62, 66, 0.9);
 }
 
+/* Linux di dalam Tauri (WebKitGTK tanpa compositing): jendela transparan tidak dibersihkan antar
+   repaint, jadi piksel setengah transparan yang digambar ulang makin pekat (baji hitam di sudut
+   bawah dari bayangan, pita terang dari isian). Karena itu: isian buram penuh dan tanpa bayangan;
+   di luar kartu hanya ada piksel transparan penuh. */
+html[data-material="solid"][data-os="linux"] {
+  --fill: rgb(250, 250, 252);
+  --pill-fill: rgb(235, 235, 240);
+  --shadow: none;
+}
+html[data-material="solid"][data-os="linux"][data-theme="dark"] {
+  --fill: rgb(34, 34, 37);
+  --pill-fill: rgb(62, 62, 66);
+}
+
 /* Kaca (css/native): isian terang sedikit lebih pekat dan terjemah dipertegas agar kontras >= 4,5:1
    di atas latar putih maupun hitam (lihat laporan Task 12). */
 html[data-material="css"],

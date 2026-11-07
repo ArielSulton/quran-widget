@@ -9,7 +9,7 @@
 
 **Simak** (from the Indonesian word "simak": to listen with full attention) is a small desktop widget. It shows the Quranic ayah, with its Indonesian translation, that is being recited on a track in the Spotify app. Search name: *Simak Ayat*. Tagline: *Ayat yang sedang dibacakan* (the ayah being recited).
 
-> **Status: pre-release.** Installers for Linux, macOS and Windows are on the [Releases](https://github.com/ArielSulton/quran-widget/releases) page. Only Linux is verified. The macOS and Windows builds are experimental and not code-signed, so your OS will show a warning the first time you open them (see below).
+> **Status: pre-release (v0.1.0).** Installers for Linux, macOS and Windows are on the [Releases](https://github.com/ArielSulton/quran-widget/releases) page. Only Linux is verified. The macOS and Windows builds are experimental and not code-signed, so your OS will show a warning the first time you open them (see below).
 
 ### Screenshots
 
@@ -34,7 +34,7 @@ Download the file for your system from [Releases](https://github.com/ArielSulton
 
 | System | File | Notes |
 |---|---|---|
-| Linux | `.deb` (Debian, Ubuntu) or `.AppImage` | AppImage: `chmod +x Simak_*.AppImage` then run it. Verified. |
+| Linux | `.deb` (Debian, Ubuntu), `.rpm` (Fedora, openSUSE) or `.AppImage` | AppImage: `chmod +x Simak_*.AppImage` then run it. Verified. |
 | macOS | `.dmg` (universal: Apple silicon and Intel) | Experimental. Drag Simak to Applications. Gatekeeper blocks unsigned apps: right-click Simak, choose Open, or allow it in System Settings > Privacy & Security ("Open Anyway"). macOS asks permission for Simak to control Spotify: allow it. |
 | Windows | `-setup.exe` or `.msi` | Experimental. SmartScreen shows "Windows protected your PC": More info > Run anyway. |
 
@@ -197,7 +197,7 @@ Unduh file untuk sistem Anda dari [Releases](https://github.com/ArielSulton/qura
 
 | Sistem | File | Catatan |
 |---|---|---|
-| Linux | `.deb` (Debian, Ubuntu) atau `.AppImage` | AppImage: `chmod +x Simak_*.AppImage` lalu jalankan. Terverifikasi. |
+| Linux | `.deb` (Debian, Ubuntu), `.rpm` (Fedora, openSUSE) atau `.AppImage` | AppImage: `chmod +x Simak_*.AppImage` lalu jalankan. Terverifikasi. |
 | macOS | `.dmg` (universal: Apple silicon dan Intel) | Eksperimental. Seret Simak ke Applications. Gatekeeper memblokir aplikasi tak bertanda: klik kanan Simak lalu pilih Open, atau izinkan di System Settings > Privacy & Security ("Open Anyway"). macOS meminta izin agar Simak mengontrol Spotify: izinkan. |
 | Windows | `-setup.exe` atau `.msi` | Eksperimental. SmartScreen menampilkan "Windows protected your PC": More info > Run anyway. |
 

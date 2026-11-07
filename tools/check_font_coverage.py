@@ -31,9 +31,19 @@ def _basmalah() -> str:
     return m.group(1)
 
 
+def _end_of_ayah_chars() -> str:
+    """Characters the UI adds around each ayah (src/main.ts): NBSP, U+06DD and the Arabic-Indic digits of src/viewModel.ts."""
+    src = VIEW_MODEL.read_text(encoding="utf-8")
+    digits = re.search(r'ARABIC_INDIC_DIGITS\s*=\s*"([^"]+)"', src)
+    if not digits:
+        raise RuntimeError(f"ARABIC_INDIC_DIGITS not found in {VIEW_MODEL}")
+    return "\u00a0\u06dd" + digits.group(1)
+
+
 def used_codepoints(data_path: Path = DEFAULT_DATA) -> set[int]:
     data = json.loads(Path(data_path).read_text(encoding="utf-8"))
     text = _basmalah() + "".join(a["ar"] for s in data.values() for a in s["ayat"])
+    text += _end_of_ayah_chars()
     return {ord(c) for c in text}
 
 
